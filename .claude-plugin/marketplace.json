@@ -1,0 +1,20 @@
+{
+  "name": "back-to-school-skills",
+  "description": "Claude skills for students",
+  "owner": {
+    "name": "Connor",
+    "url": "https://github.com/YOUR-GITHUB-USERNAME"
+  },
+  "plugins": [
+    {
+      "name": "back-to-school",
+      "displayName": "Back to School",
+      "description": "Seven Claude skills for students: tutoring, assignment triage, drafting, emails, learning new skills, cramming, and weekly planning.",
+      "source": "./",
+      "version": "1.0.0",
+      "license": "MIT",
+      "category": "productivity",
+      "keywords": ["students", "school", "study", "tutoring", "education"]
+    }
+  ]
+}
