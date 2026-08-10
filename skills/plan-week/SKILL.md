@@ -8,6 +8,12 @@ argument-hint: [your classes, work hours, and what's due this week]
 
 Input: $ARGUMENTS
 
+**Check `~/.claude/canvas/snapshot.json` first** — if it's there, that's the
+deadline list, and the syllabus data tells you what each thing is worth. Refresh
+with the `canvas` skill if it's stale. If it doesn't exist and they use Canvas,
+offer `/canvas`. Then ask what Canvas doesn't know: work shifts, practice,
+commute, non-Canvas classes.
+
 Most student schedules fail for one reason: they're built for an idealized
 person with no friction. This one is built with slack in it.
 

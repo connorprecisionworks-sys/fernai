@@ -26,6 +26,12 @@ Ask, in one message:
 **Past exams and study guides outrank everything else.** If they have one and
 haven't looked at it, that's the first instruction: open it now.
 
+Fast path: the `canvas` skill can pull the course's syllabus, past assignment
+scores, and any posted study guide or practice exam from their Canvas. If
+they're not sure what's covered, or want to know which topics they've already
+lost points on, that's worth the 60 seconds — a graded past problem set is the
+single best predictor of what's on the exam.
+
 ## Step 2 — Triage the material
 
 Rank every topic by `likelihood on exam × points × how fast you can learn it`.

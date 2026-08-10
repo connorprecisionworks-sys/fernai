@@ -1,20 +1,25 @@
 # Back to School — Claude Skills for Students
 
-Seven skills that turn Claude into something actually useful during a semester.
-Install once, then type `/tutor`, `/triage`, `/cram` and go.
+Nine skills that turn Claude into something actually useful during a semester.
+Install once, then type `/due`, `/triage`, `/cram` and go.
+
+It reads your real Canvas assignments, so the plans are about your actual
+coursework — not a list you had to type out.
 
 No fluff, no "as an AI language model." Each one is a procedure someone who's
 good at that thing would actually follow.
 
 | Command      | What it does |
 |--------------|--------------|
+| `/canvas`    | Pulls your assignments, due dates, and grades out of Canvas via your logged-in browser. No token, no password. |
+| `/due`       | "What's due?" in five seconds. Overdue first, then the week. Nothing else. |
+| `/triage`    | Your whole workload → one ranked do-this-next list. Tells you when it doesn't fit. |
+| `/plan-week` | A weekly schedule with slack built in, so it survives past Tuesday. |
 | `/tutor`     | Diagnoses what you actually don't understand, then teaches that — by asking, not lecturing. |
-| `/triage`    | Dumps of assignments in, one ranked do-this-next list out. Tells you when it doesn't fit. |
+| `/cram`      | Emergency exam prep. Triages material, drills you, quizzes you hard, tells you to sleep. |
 | `/draft`     | Gets you off the blank page: outline, then a draft you rewrite. Ships with an integrity handoff. |
 | `/email`     | Emails to professors, TAs, advisors that get a yes. Extensions, grade reviews, rec letters. |
 | `/learn`     | A brutal, project-first plan for learning a new skill on a deadline. |
-| `/cram`      | Emergency exam prep. Triages material, drills you, quizzes you hard, tells you to sleep. |
-| `/plan-week` | A weekly schedule with slack built in, so it survives past Tuesday. |
 
 ## Install
 
@@ -58,18 +63,66 @@ body into any chat with Claude (or another model), add your specifics, go.
 
 ## Usage
 
-Pass your context on the same line:
+Start of semester, run once:
+
+```
+/canvas
+```
+
+It opens a tab in your browser, reads the Canvas you're already logged into,
+and saves everything to `~/.claude/canvas/snapshot.json`. After that:
+
+```
+/due                    what's overdue and what's this week
+/triage                 ranked plan from your real assignments
+/plan-week              a schedule built around your real deadlines
+/canvas refresh         resync after new stuff gets posted
+```
+
+Everything else takes context on the same line:
 
 ```
 /tutor eigenvectors, I get the definition but not why anyone cares
-/triage    (then paste everything you owe)
 /cram orgo midterm, 6 hours from now, ch 1-7, haven't started
 /email need a 3-day extension on my BIOL 201 lab, prof is strict
-/plan-week 4 classes, 15hr/wk job, two papers due Friday
+/learn react, 6 weeks, ~8hrs a week, want to ship a real app
 ```
 
 Claude will also pull these up on its own when the conversation matches — you
 don't have to remember the command.
+
+## How the Canvas part works
+
+**No API token. No password. No credentials anywhere.**
+
+`/canvas` drives the Chrome you're already signed into, opens your Canvas
+pages, and reads them the way you would. It touches four pages:
+
+| Page | What it gets |
+|------|--------------|
+| `/grades` | every course + your current grade, in one shot |
+| `/courses/<id>/assignments` | titles, due dates, point values |
+| `/courses/<id>/grades` | scores, what's ungraded, what's missing |
+| `/courses/<id>/assignments/syllabus` | schedule and grade weighting |
+
+It's read-only. It won't submit, delete, or unenroll anything, and it will
+**never open a quiz or timed exam page** — some are single-attempt and opening
+one starts your clock.
+
+Requires the [Claude in Chrome](https://www.anthropic.com/claude/chrome)
+extension. Two fallbacks if you don't have it or it breaks:
+
+- **Calendar feed** — Canvas → Calendar → "Calendar Feed" (bottom right) gives
+  you a personal `.ics` URL. Paste it. Gets due dates and titles, no grades.
+- **Paste** — copy your assignments page and paste it in. Always works, takes
+  30 seconds.
+
+Your snapshot lives at `~/.claude/canvas/snapshot.json` on your own machine.
+Nothing is uploaded anywhere. Delete the file and it's gone.
+
+Other LMS? The `canvas` skill is a page-reading procedure, not Canvas-specific
+code — point it at Blackboard, Moodle, or Brightspace and it mostly works. PRs
+welcome for proper versions.
 
 ## A note on `/draft`
 
@@ -87,13 +140,15 @@ rubric — do that part.
 ```
 back-to-school-skills/
 ├── skills/
-│   ├── tutor/SKILL.md
+│   ├── canvas/SKILL.md      <- pulls data, writes the snapshot
+│   ├── due/SKILL.md
 │   ├── triage/SKILL.md
+│   ├── plan-week/SKILL.md
+│   ├── tutor/SKILL.md
+│   ├── cram/SKILL.md
 │   ├── draft/SKILL.md
 │   ├── email/SKILL.md
-│   ├── learn/SKILL.md
-│   ├── cram/SKILL.md
-│   └── plan-week/SKILL.md
+│   └── learn/SKILL.md
 ├── .claude-plugin/
 │   ├── plugin.json
 │   └── marketplace.json
@@ -123,10 +178,11 @@ write it as *when to use this*, not *what this is*.
 
 PRs welcome, especially:
 
+- Blackboard / Moodle / Brightspace versions of `/canvas`
 - Subject-specific tutors (`/tutor-calc`, `/tutor-orgo`)
 - `/read` — getting through dense assigned reading
 - `/office-hours` — what to actually ask when you get there
-- `/debug-my-grade` — where the points went and how to get them back
+- `/grade-check` — where the points went and what's still recoverable
 
 Keep the house style: short, direct, procedural. No motivational filler.
 
