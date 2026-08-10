@@ -1,6 +1,6 @@
 # Back to School — Claude Skills for Students
 
-Nine skills that turn Claude into something actually useful during a semester.
+Ten skills that turn Claude into something actually useful during a semester.
 Install once, then type `/due`, `/triage`, `/cram` and go.
 
 It reads your real Canvas assignments, so the plans are about your actual
@@ -12,6 +12,7 @@ good at that thing would actually follow.
 | Command      | What it does |
 |--------------|--------------|
 | `/canvas`    | Pulls your assignments, due dates, and grades out of Canvas via your logged-in browser. No token, no password. |
+| `/canvas-dev`| Opt-in: direct Canvas API access with your own token. Faster, but you accept the risks. |
 | `/due`       | "What's due?" in five seconds. Overdue first, then the week. Nothing else. |
 | `/triage`    | Your whole workload → one ranked do-this-next list. Tells you when it doesn't fit. |
 | `/plan-week` | A weekly schedule with slack built in, so it survives past Tuesday. |
@@ -124,6 +125,57 @@ Other LMS? The `canvas` skill is a page-reading procedure, not Canvas-specific
 code — point it at Blackboard, Moodle, or Brightspace and it mostly works. PRs
 welcome for proper versions.
 
+## Developer mode (`/canvas-dev`) — opt in, at your own risk
+
+If you'd rather hit the Canvas API directly, you can. It's a real speed
+difference and you get exact data instead of parsed pages:
+
+|               | `/canvas` (default) | `/canvas-dev` |
+|---------------|---------------------|---------------|
+| Setup         | none                | make a token, ~2 min |
+| Sync time     | ~1 min              | ~3 sec |
+| Data          | what's on the page  | everything, exact |
+| Stored secret | none                | a token on your machine |
+| School policy | always fine         | **check yours** |
+
+```bash
+python3 ~/.claude/skills/canvas/scripts/canvas-api.py setup
+```
+
+It prints the risks and won't save anything until you type `I ACCEPT`. Then:
+
+```bash
+canvas-api.py pull                # -> snapshot.json, same format as browser mode
+canvas-api.py pull --course chem  # one course
+canvas-api.py status              # what's configured (never prints the token)
+canvas-api.py test                # is the token still good
+canvas-api.py revoke              # delete the local token
+```
+
+`/due`, `/triage`, `/plan-week` and `/cram` don't care which mode produced the
+snapshot — they work the same either way.
+
+**The deal you're accepting:**
+
+- Your token lives at `~/.claude/canvas/credentials.json`, mode `0600`,
+  **unencrypted**. Anyone who can read that file can act as you in Canvas.
+- The script only ever sends `GET` requests — it can't submit, delete, or
+  change anything. But the token itself is a full-access credential. Something
+  else with it could.
+- **Set an expiry date when you create the token.** End of semester. This is
+  the single best thing you can do to limit the damage if it leaks.
+- Lots of schools restrict or ban API tokens in their acceptable-use policy,
+  and some disable them outright. Check yours. That's on you.
+- `revoke` deletes the local copy — it does **not** invalidate the token.
+  Also delete it in Canvas: Account → Settings → Approved Integrations.
+
+Get a token at Canvas → Account → Settings → "+ New Access Token". Canvas
+shows it once. Never paste it into a chat, a repo, or a command line argument
+(`ps` and your shell history can see argv — let the script prompt you).
+
+Stdlib Python only, no dependencies, ~250 lines. Read it before you run it:
+[`skills/canvas/scripts/canvas-api.py`](skills/canvas/scripts/canvas-api.py).
+
 ## A note on `/draft`
 
 `/draft` produces drafts, and every draft it produces ends with a required
@@ -140,7 +192,9 @@ rubric — do that part.
 ```
 back-to-school-skills/
 ├── skills/
-│   ├── canvas/SKILL.md      <- pulls data, writes the snapshot
+│   ├── canvas/SKILL.md            <- browser mode, writes the snapshot
+│   ├── canvas/scripts/canvas-api.py
+│   ├── canvas-dev/SKILL.md        <- opt-in API mode
 │   ├── due/SKILL.md
 │   ├── triage/SKILL.md
 │   ├── plan-week/SKILL.md

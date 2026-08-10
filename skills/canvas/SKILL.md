@@ -11,6 +11,22 @@ Request: $ARGUMENTS
 Reads Canvas through the student's own logged-in browser. No API token, no
 password, nothing stored but a local JSON file of their coursework.
 
+## Fast path — check for dev mode first
+
+If `~/.claude/canvas/credentials.json` exists, the student opted into API
+mode. Just run the script and skip everything below — it's 3 seconds instead
+of a minute:
+
+```bash
+python3 ~/.claude/skills/canvas/scripts/canvas-api.py pull
+```
+
+Then jump to **Report back**. If it errors, fall through to browser mode and
+mention the error once.
+
+Don't suggest setting up dev mode unprompted. Browser mode is the default for
+a reason. `/canvas-dev` exists if they ask.
+
 ## Before anything
 
 Invoke the `claude-in-chrome` skill first — the browser tools require it.
