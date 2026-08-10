@@ -7,6 +7,7 @@ what to do tonight.
 
   bts              chat (default)
   bts demo         load a fake semester and try it without Canvas
+  bts doctor       check colors, PATH, and the claude CLI
   bts packet       build a study packet from your course materials
   bts ask "..."    one question, one answer
   bts due          what's overdue and what's this week
@@ -37,15 +38,17 @@ from datetime import datetime, timedelta, timezone
 DIR = os.path.expanduser("~/.claude/canvas")
 CREDS = os.path.join(DIR, "credentials.json")
 SNAPSHOT = os.path.join(DIR, "snapshot.json")
-VERSION = "1.5.0"
+VERSION = "1.5.1"
 
 
 # ───────────────────────────── style ─────────────────────────────
 
 class S:
     """ANSI styling that degrades to plain text when it should."""
-    on = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None \
-        and os.environ.get("TERM") != "dumb"
+    on = (os.environ.get("FORCE_COLOR") not in (None, "", "0")) or (
+        sys.stdout.isatty()
+        and os.environ.get("NO_COLOR") is None
+        and os.environ.get("TERM") != "dumb")
 
     @staticmethod
     def _w(code, s):
@@ -1066,9 +1069,22 @@ CHAT_HELP = [
 
 
 def cmd_chat(args):
+    banner()
+
     if not have_claude():
-        die("Chat needs the `claude` CLI, which isn't installed.",
-            "Everything else works without it — try:  bts due")
+        box("Chat needs the claude CLI", [
+            f"{S.bold('bts chat runs on the `claude` CLI')} — that's how there's no second",
+            "API key to set up. It isn't on your PATH right now.",
+            "",
+            f"  {S.cyan('https://claude.com/claude-code')}",
+            "",
+            "Everything else works without it:",
+            f"  {S.cyan('bts demo')}    load a fake semester",
+            f"  {S.cyan('bts due')}     what's overdue and coming up",
+            f"  {S.cyan('bts status')}  what's configured",
+        ], S.yellow)
+        print()
+        sys.exit(1)
 
     try:
         import readline  # noqa: F401  (gives arrow keys + history)
@@ -1081,7 +1097,6 @@ def cmd_chat(args):
     except ImportError:
         readline = None
 
-    banner()
     have_snap = os.path.exists(SNAPSHOT)
     if have_snap:
         with open(SNAPSHOT) as f:
@@ -1180,7 +1195,7 @@ def cmd_demo(args):
 
     write_private(SNAPSHOT, data)
     n = sum(len(c["assignments"]) for c in data["courses"])
-    print()
+    banner()
     box("Demo semester loaded", [
         f"{len(data['courses'])} courses, {n} assignments — dated relative to today, so",
         "there's always something overdue and something due tomorrow.",
@@ -1192,6 +1207,56 @@ def cmd_demo(args):
         f"{S.gray('Fake data. Nothing is connected to a real Canvas.')}",
         f"{S.gray('Clear it with:')} {S.cyan('bts revoke --all')}",
     ], S.green)
+    print()
+
+
+def cmd_doctor(args):
+    """Why don't I see the colors / why doesn't chat work."""
+    banner()
+    rule("checks")
+    print()
+
+    tty = sys.stdout.isatty()
+    (ok if tty else warn)(
+        f"stdout is a terminal: {tty}"
+        + ("" if tty else "  — piped or redirected, so colors auto-off"))
+
+    term = os.environ.get("TERM", "(unset)")
+    (ok if term not in ("dumb", "(unset)") else warn)(f"TERM = {term}")
+
+    if os.environ.get("NO_COLOR") is not None:
+        warn("NO_COLOR is set — that's what's disabling colors. Unset it.")
+    else:
+        ok("NO_COLOR not set")
+
+    (ok if S.on else warn)(f"color output: {'on' if S.on else 'OFF'}"
+                           + ("" if S.on else "  — force it with FORCE_COLOR=1"))
+
+    c = shutil.which("claude")
+    (ok if c else warn)(f"claude CLI: {c or 'not found — chat will not work'}")
+
+    me = shutil.which("bts")
+    (ok if me else warn)(f"bts on PATH: {me or 'no — you are running it by path'}")
+
+    if os.path.exists(SNAPSHOT):
+        with open(SNAPSHOT) as f:
+            snap = json.load(f)
+        src = snap.get("source", "browser")
+        ok(f"coursework: {len(snap['courses'])} courses ({src})")
+    else:
+        warn("coursework: none — run `bts demo` for fake data")
+
+    print()
+    rule("color test")
+    print()
+    print("  " + "  ".join([S.red("red"), S.yellow("yellow"), S.green("green"),
+                            S.cyan("cyan"), S.blue("blue"), S.mag("magenta"),
+                            S.gray("gray"), S.bold("bold"), S.dim("dim")]))
+    print(f"  {S.cyan('╭─── box ───╮')}   {S.cyan('⠋')} spinner   "
+          f"{S.green(TICK)} {S.red(CROSS)} {S.cyan(DOT)} {S.cyan(ARROW)}")
+    print()
+    info("If that line is unreadable or shows boxes, your terminal font is missing")
+    info("the glyphs. Everything still works — try a Nerd Font or JetBrains Mono.")
     print()
 
 
@@ -1248,6 +1313,9 @@ def main():
     s = sub.add_parser("packet", help="build a study packet")
     s.add_argument("about", nargs="*", help="course + what it covers")
     s.set_defaults(func=cmd_packet)
+
+    sub.add_parser("doctor", help="why don't I see colors / why is chat broken") \
+        .set_defaults(func=cmd_doctor)
 
     s = sub.add_parser("demo", help="load a fake semester to try this out")
     s.add_argument("-f", "--force", action="store_true", help="overwrite real coursework")

@@ -48,6 +48,15 @@ bts demo     # loads a fake semester, dated relative to today
 bts          # start chatting about it
 ```
 
+The banner and the boxes show up on `bts`, `bts demo`, `bts setup` and
+`bts doctor`. The data commands (`bts due`, `bts status`) skip the banner on
+purpose — you run those twenty times a day.
+
+**Not seeing colors?** Run `bts doctor`. Usual causes: output is piped or
+redirected (colors auto-disable — override with `FORCE_COLOR=1`), `NO_COLOR`
+is set in your shell, or `TERM=dumb`. It also checks whether `bts` and
+`claude` are actually on your PATH.
+
 You get five courses with real-looking grades, three overdue assignments, a
 problem set due tomorrow and a midterm in eleven days. Clear it any time with
 `bts revoke --all`.
