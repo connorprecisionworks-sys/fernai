@@ -1,6 +1,6 @@
 # Back to School — Claude Skills for Students
 
-Ten skills that turn Claude into something actually useful during a semester.
+Ten skills plus a CLI that turn Claude into something actually useful during a semester.
 Install once, then type `/due`, `/triage`, `/cram` and go.
 
 It reads your real Canvas assignments, so the plans are about your actual
@@ -42,19 +42,57 @@ install -m 755 bin/bts ~/.local/bin/bts
 
 ### The CLI
 
-`bts` is a single stdlib-Python file — no pip, no dependencies, works on macOS
-and Linux out of the box.
+Just run `bts`. It opens a chat:
 
 ```
-bts setup     guided Canvas setup (opt-in, see below)
-bts sync      pull assignments and grades
-bts due       what's overdue and what's this week
-bts status    what's configured
-bts revoke    delete the saved token
+❯ bts
+
+  ✓ 5 courses, 22 assignments loaded
+  Ask anything. /help for commands, /exit to quit.
+
+❯ what should i work on tonight
+
+  Tonight's biggest fire: CHEM 240 Problem set 3 is due tomorrow (Tue Aug 11,
+  11:59pm) — start there.
+
+  Also worth squeezing in, since CHEM 240 is your weakest grade (76.2%, C):
+  • Lab safety module — missing, only 15 pts, likely quick
+  • Lab 1: Microscopy writeup (BIOL 201) — missing, 50 pts, overdue since Fri
+
+  If you want this as a time-blocked plan, /plan-week can do that.
+
+❯ i only have 3 hours after dinner, whats realistic
 ```
 
-It's colored and boxed on a terminal, and degrades to clean plain text when
-piped or when `NO_COLOR` is set — so `bts due | grep CHEM` works fine.
+It knows your actual courses, grades, and deadlines, and it remembers the
+conversation. Inside the chat:
+
+```
+/due       show the assignment list      /new    fresh conversation
+/sync      refresh from Canvas           /help   commands
+/status    what's configured             /exit   quit
+```
+
+Any *other* slash command is handed straight to Claude, so `/tutor`,
+`/triage`, `/plan-week`, `/cram`, `/draft`, `/email` and `/learn` all work
+from inside the chat too.
+
+Prefer one-shot? Every command also works directly:
+
+```
+bts ask "when is my chem midterm"
+bts due                    # just the list, no chat
+bts sync                   # refresh coursework
+bts setup / status / revoke
+```
+
+**Chat needs the [`claude` CLI](https://claude.com/claude-code)** — it wraps
+the one you already have, so there's no second API key and no extra cost.
+Everything that isn't chat (`due`, `sync`, `status`) is pure stdlib Python and
+works without it.
+
+Output is colored and boxed on a terminal and degrades to clean plain text
+when piped or when `NO_COLOR` is set — so `bts due | grep CHEM` works fine.
 
 ### Option B — install as a plugin
 
