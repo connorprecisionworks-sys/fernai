@@ -11,7 +11,7 @@
       "displayName": "Back to School",
       "description": "Nine Claude skills for students: pulls real assignments and grades from Canvas, then handles triage, weekly planning, tutoring, cramming, drafting, and emails.",
       "source": "./",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "license": "MIT",
       "category": "productivity",
       "keywords": ["students", "school", "study", "tutoring", "education"]
