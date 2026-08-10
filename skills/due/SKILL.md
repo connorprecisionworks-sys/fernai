@@ -39,6 +39,15 @@ Nothing due: say "Nothing due in the next 7 days." and stop.
 
 ## Rules
 
+- **Prefer the CLI if it's installed:** `bts due` prints this exact list,
+  formatted and colored, in about 50ms. Run it and show the output. Only build
+  the list by hand if `bts` isn't on PATH.
+- Groups, in this order: `OVERDUE`, `TODAY`, `TOMORROW`, `THIS WEEK`,
+  `NO DUE DATE`. Skip any group that's empty. Never invent other groups.
+- **Copy the course code exactly as it appears in the snapshot.** Don't
+  abbreviate, correct, or retype it from memory — a wrong course code sends
+  someone to the wrong class.
+- Mark `missing` and `late` items with that word. Don't soften it.
 - **Overdue goes first, always.** Never bury a missing assignment below
   upcoming work.
 - Sort by due time within each group.

@@ -1,7 +1,7 @@
 ---
 name: canvas-dev
 description: Opt-in developer mode - set up direct Canvas API access with a personal access token stored locally, for students who want faster and more complete syncs than browser reading. Use when the user asks about the Canvas API, wants a token-based setup, developer mode, faster sync, or wants to check, test, or remove a saved Canvas token.
-argument-hint: [setup | test | status | pull | revoke]
+argument-hint: [setup | sync | due | status | revoke]
 ---
 
 # Canvas Dev Mode
@@ -13,9 +13,8 @@ it means a token sits on this machine. **This is opt-in and the student
 accepts the risk.** Default everyone to `/canvas` (browser) unless they ask
 for this specifically.
 
-Script: `${CLAUDE_SKILL_DIR}/../canvas/scripts/canvas-api.py`
-(if that path doesn't resolve, find `canvas-api.py` under the installed skills
-directory — typically `~/.claude/skills/canvas/scripts/`)
+CLI: `bts` (installed by `install.sh` to `~/.local/bin/bts`).
+If `bts` isn't on PATH, run it directly from the repo: `./bin/bts`.
 
 ## Show the tradeoff first
 
@@ -43,11 +42,11 @@ Canvas → Account → Settings → **"+ New Access Token"**.
   control that limits the blast radius if the token ever leaks.
 - Canvas shows the token **once**. Copy it.
 
-**2. Run setup.** The script prints the risk notice and requires the student
+**2. Run setup.** `bts` prints the risk notice and requires the student
 to type `I ACCEPT` before it saves anything:
 
 ```bash
-python3 ~/.claude/skills/canvas/scripts/canvas-api.py setup
+bts setup
 ```
 
 It prompts for the Canvas URL and reads the token with hidden input.
@@ -65,23 +64,25 @@ one — it's now in a conversation log.
 ## Commands
 
 ```bash
-canvas-api.py setup              # save URL + token (requires "I ACCEPT")
-canvas-api.py test               # verify the token still works
-canvas-api.py pull               # fetch everything -> snapshot.json
-canvas-api.py pull --course chem # one course only
-canvas-api.py status             # what's configured (never shows the token)
-canvas-api.py revoke             # delete the local token
+bts setup              # guided setup (requires typing "I ACCEPT")
+bts sync               # fetch everything -> snapshot.json
+bts sync --course chem # one course only
+bts due                # overdue + next 7 days, straight in the terminal
+bts status             # what's configured (never shows the token)
+bts test               # is the token still good
+bts revoke             # delete the local token
+bts revoke --all       # ...and the coursework snapshot
 ```
 
-`pull` writes `~/.claude/canvas/snapshot.json` in the same format the browser
+`bts sync` writes `~/.claude/canvas/snapshot.json` in the same format the browser
 path produces, so `/due`, `/triage`, `/plan-week`, and `/cram` work identically
 either way. The only difference is `"source": "api"`.
 
-## What the script does and doesn't do
+## What bts does and doesn't do
 
 - **GET requests only.** It cannot submit, delete, or change anything.
 - Token at `~/.claude/canvas/credentials.json`, mode `0600`, unencrypted.
-- Stdlib Python only. No dependencies, no network calls anywhere but their
+- Stdlib Python only, single file. No dependencies, no network calls anywhere but their
   own Canvas.
 - Nothing is uploaded. Everything stays on their machine.
 
@@ -96,12 +97,12 @@ Say that plainly if they ask.
 - **No token option in Canvas settings** — the school turned it off. Same
   answer: use `/canvas`.
 - **Missing assignments** — the course may be unpublished, concluded, or the
-  assignment has no due date. `pull` only includes active enrollments.
+  assignment has no due date. `bts sync` only includes active enrollments.
 
 ## Revoking
 
 ```bash
-canvas-api.py revoke
+bts revoke
 ```
 
 Then tell them the part people forget: **deleting the local file does not

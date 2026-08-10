@@ -1,22 +1,46 @@
 #!/usr/bin/env bash
 # Installs the Back to School skills into ~/.claude/skills/
-# so you can run them as /tutor, /triage, /draft, etc.
+# and the `bts` CLI onto your PATH.
 set -euo pipefail
 
-SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/skills"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST="$HOME/.claude/skills"
+BIN="${BTS_BIN_DIR:-$HOME/.local/bin}"
 
+bold() { printf '\033[1m%s\033[0m\n' "$1"; }
+ok()   { printf '  \033[38;5;114m✓\033[0m %s\n' "$1"; }
+skip() { printf '  \033[38;5;245m·\033[0m %s\n' "$1"; }
+warn() { printf '  \033[38;5;221m!\033[0m %s\n' "$1"; }
+
+echo
+bold "skills → $DEST"
 mkdir -p "$DEST"
-
-for dir in "$SRC"/*/; do
+for dir in "$ROOT"/skills/*/; do
   name="$(basename "$dir")"
-  if [ -e "$DEST/$name" ]; then
-    echo "skip  /$name  (already exists at $DEST/$name)"
+  if [ -e "$DEST/$name" ] && [ "${BTS_FORCE:-0}" != "1" ]; then
+    skip "/$name already exists (BTS_FORCE=1 to overwrite)"
   else
+    rm -rf "${DEST:?}/$name"
     cp -R "$dir" "$DEST/$name"
-    echo "ok    /$name"
+    ok "/$name"
   fi
 done
 
 echo
-echo "Done. Restart Claude Code, then type / to see them."
+bold "cli → $BIN/bts"
+mkdir -p "$BIN"
+install -m 0755 "$ROOT/bin/bts" "$BIN/bts"
+ok "bts installed"
+
+if ! command -v bts >/dev/null 2>&1; then
+  echo
+  warn "$BIN is not on your PATH. Add this to your shell profile:"
+  printf '\n      export PATH="%s:$PATH"\n' "$BIN"
+fi
+
+echo
+bold "next"
+echo "  bts setup                 set up Canvas (optional, opt-in)"
+echo "  bts due                   what's due"
+echo "  restart Claude Code, then type / to see the skills"
+echo

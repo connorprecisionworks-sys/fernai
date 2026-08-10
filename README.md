@@ -24,21 +24,37 @@ good at that thing would actually follow.
 
 ## Install
 
-### Option A — copy the skills (simplest, gives you clean `/tutor`)
-
 ```bash
 git clone https://github.com/YOUR-GITHUB-USERNAME/back-to-school-skills.git
 cd back-to-school-skills
 ./install.sh
 ```
 
-Restart Claude Code. Type `/` and they're there.
+That copies the skills to `~/.claude/skills/` and puts the `bts` CLI on your
+PATH. Restart Claude Code, type `/`, and they're there.
 
 Manual version, if you'd rather see what's happening:
 
 ```bash
 cp -R skills/* ~/.claude/skills/
+install -m 755 bin/bts ~/.local/bin/bts
 ```
+
+### The CLI
+
+`bts` is a single stdlib-Python file — no pip, no dependencies, works on macOS
+and Linux out of the box.
+
+```
+bts setup     guided Canvas setup (opt-in, see below)
+bts sync      pull assignments and grades
+bts due       what's overdue and what's this week
+bts status    what's configured
+bts revoke    delete the saved token
+```
+
+It's colored and boxed on a terminal, and degrades to clean plain text when
+piped or when `NO_COLOR` is set — so `bts due | grep CHEM` works fine.
 
 ### Option B — install as a plugin
 
@@ -139,17 +155,20 @@ difference and you get exact data instead of parsed pages:
 | School policy | always fine         | **check yours** |
 
 ```bash
-python3 ~/.claude/skills/canvas/scripts/canvas-api.py setup
+bts setup
 ```
 
-It prints the risks and won't save anything until you type `I ACCEPT`. Then:
+A four-step wizard. It prints the risks and won't save anything until you type
+`I ACCEPT`. Then:
 
 ```bash
-canvas-api.py pull                # -> snapshot.json, same format as browser mode
-canvas-api.py pull --course chem  # one course
-canvas-api.py status              # what's configured (never prints the token)
-canvas-api.py test                # is the token still good
-canvas-api.py revoke              # delete the local token
+bts sync                # -> snapshot.json, same format as browser mode
+bts sync --course chem  # one course
+bts due                 # the list, straight in your terminal
+bts status              # what's configured (never prints the token)
+bts test                # is the token still good
+bts revoke              # delete the local token
+bts revoke --all        # ...and the coursework snapshot
 ```
 
 `/due`, `/triage`, `/plan-week` and `/cram` don't care which mode produced the
@@ -173,8 +192,8 @@ Get a token at Canvas → Account → Settings → "+ New Access Token". Canvas
 shows it once. Never paste it into a chat, a repo, or a command line argument
 (`ps` and your shell history can see argv — let the script prompt you).
 
-Stdlib Python only, no dependencies, ~250 lines. Read it before you run it:
-[`skills/canvas/scripts/canvas-api.py`](skills/canvas/scripts/canvas-api.py).
+Stdlib Python only, no dependencies, one file. Read it before you run it:
+[`bin/bts`](bin/bts).
 
 ## A note on `/draft`
 
@@ -193,7 +212,6 @@ rubric — do that part.
 back-to-school-skills/
 ├── skills/
 │   ├── canvas/SKILL.md            <- browser mode, writes the snapshot
-│   ├── canvas/scripts/canvas-api.py
 │   ├── canvas-dev/SKILL.md        <- opt-in API mode
 │   ├── due/SKILL.md
 │   ├── triage/SKILL.md
@@ -203,6 +221,8 @@ back-to-school-skills/
 │   ├── draft/SKILL.md
 │   ├── email/SKILL.md
 │   └── learn/SKILL.md
+├── bin/
+│   └── bts                        <- the CLI
 ├── .claude-plugin/
 │   ├── plugin.json
 │   └── marketplace.json

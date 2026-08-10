@@ -1,0 +1,635 @@
+#!/usr/bin/env python3
+"""
+bts — Back To School CLI
+
+Setup and sync your coursework from the terminal.
+
+  bts setup      guided setup (Canvas URL + access token)
+  bts sync       pull assignments and grades
+  bts due        what's overdue and what's this week
+  bts status     what's configured
+  bts revoke     delete the saved token
+
+Stdlib only. Everything stays on this machine.
+"""
+
+import argparse
+import getpass
+import json
+import os
+import re
+import shutil
+import sys
+import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import datetime, timedelta, timezone
+
+DIR = os.path.expanduser("~/.claude/canvas")
+CREDS = os.path.join(DIR, "credentials.json")
+SNAPSHOT = os.path.join(DIR, "snapshot.json")
+VERSION = "1.3.0"
+
+
+# ───────────────────────────── style ─────────────────────────────
+
+class S:
+    """ANSI styling that degrades to plain text when it should."""
+    on = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None \
+        and os.environ.get("TERM") != "dumb"
+
+    @staticmethod
+    def _w(code, s):
+        return f"\033[{code}m{s}\033[0m" if S.on else str(s)
+
+    bold   = staticmethod(lambda s: S._w("1", s))
+    dim    = staticmethod(lambda s: S._w("2", s))
+    it     = staticmethod(lambda s: S._w("3", s))
+    under  = staticmethod(lambda s: S._w("4", s))
+    red    = staticmethod(lambda s: S._w("38;5;203", s))
+    green  = staticmethod(lambda s: S._w("38;5;114", s))
+    yellow = staticmethod(lambda s: S._w("38;5;221", s))
+    blue   = staticmethod(lambda s: S._w("38;5;75", s))
+    cyan   = staticmethod(lambda s: S._w("38;5;80", s))
+    mag    = staticmethod(lambda s: S._w("38;5;176", s))
+    gray   = staticmethod(lambda s: S._w("38;5;245", s))
+    inv    = staticmethod(lambda s: S._w("7", s))
+
+
+TICK, CROSS, DOT, ARROW = "✓", "✗", "•", "❯"
+BAR = "│"
+
+
+def width():
+    return min(shutil.get_terminal_size((80, 24)).columns, 84)
+
+
+def vis(s):
+    return len(re.sub(r"\033\[[0-9;]*m", "", s))
+
+
+def fit(s, n, right=False):
+    """Pad/truncate to n visible columns, ignoring ANSI escapes."""
+    s = str(s)
+    v = vis(s)
+    if v > n:
+        if not S.on:
+            return s[:n]
+        out, seen = "", 0
+        i = 0
+        while i < len(s) and seen < n:
+            m = re.match(r"\033\[[0-9;]*m", s[i:])
+            if m:
+                out += m.group(0)
+                i += m.end()
+            else:
+                out += s[i]
+                seen += 1
+                i += 1
+        return out + ("\033[0m" if S.on else "")
+    pad = " " * (n - v)
+    return pad + s if right else s + pad
+
+
+def banner():
+    art = [
+        "██████╗  █████╗  ██████╗██╗  ██╗    ████████╗ ██████╗",
+        "██╔══██╗██╔══██╗██╔════╝██║ ██╔╝    ╚══██╔══╝██╔═══██╗",
+        "██████╔╝███████║██║     █████╔╝        ██║   ██║   ██║",
+        "██╔══██╗██╔══██║██║     ██╔═██╗        ██║   ██║   ██║",
+        "██████╔╝██║  ██║╚██████╗██║  ██╗       ██║   ╚██████╔╝",
+        "╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝       ╚═╝    ╚═════╝",
+    ]
+    ramp = [39, 38, 44, 43, 79, 80]
+    print()
+    for i, line in enumerate(art):
+        print("  " + (f"\033[38;5;{ramp[i]}m{line}\033[0m" if S.on else line))
+    sub = "S C H O O L"
+    print("  " + S.bold(S.cyan(sub)) + S.dim(f"   ·   coursework CLI  v{VERSION}"))
+    print()
+
+
+def rule(label=""):
+    w = width()
+    if label:
+        head = f"── {label} "
+        print(S.dim(head + "─" * max(0, w - vis(head))))
+    else:
+        print(S.dim("─" * w))
+
+
+def box(title, lines, color=S.cyan):
+    w = width()
+    t = f" {title} "
+    print(color("╭─") + color(t) + color("─" * max(0, w - 4 - len(t))) + color("╮"))
+    for ln in lines:
+        pad = max(0, w - 4 - vis(ln))
+        print(color(BAR) + " " + ln + " " * pad + " " + color(BAR))
+    print(color("╰" + "─" * (w - 2) + "╯"))
+
+
+def step(n, total, label):
+    print()
+    print(f"  {S.cyan(S.bold(f'{ARROW} {n}/{total}'))}  {S.bold(label)}")
+
+
+def ok(msg):    print(f"  {S.green(TICK)} {msg}")
+def bad(msg):   print(f"  {S.red(CROSS)} {msg}")
+def warn(msg):  print(f"  {S.yellow('!')} {msg}")
+def info(msg):  print(f"  {S.gray(DOT)} {S.gray(msg)}")
+
+
+def die(msg, hint=None):
+    print()
+    bad(S.bold(msg))
+    if hint:
+        print(f"    {S.gray(hint)}")
+    print()
+    sys.exit(1)
+
+
+class Spinner:
+    FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+    def __init__(self, text):
+        self.text, self.stop, self.t = text, False, None
+
+    def __enter__(self):
+        if not S.on:
+            print(f"  {self.text} ...", flush=True)
+            return self
+        def run():
+            i = 0
+            while not self.stop:
+                f = self.FRAMES[i % len(self.FRAMES)]
+                sys.stdout.write(f"\r  {S.cyan(f)} {self.text}\033[K")
+                sys.stdout.flush()
+                time.sleep(0.08)
+                i += 1
+        self.t = threading.Thread(target=run, daemon=True)
+        self.t.start()
+        return self
+
+    def done(self, text=None):
+        self.stop = True
+        if self.t:
+            self.t.join()
+            sys.stdout.write("\r\033[K")
+        ok(text or self.text)
+
+    def __exit__(self, *a):
+        self.stop = True
+        if self.t:
+            self.t.join()
+            sys.stdout.write("\r\033[K")
+
+
+# ───────────────────────────── storage ─────────────────────────────
+
+def load_creds(quiet=False):
+    if not os.path.exists(CREDS):
+        die("Not set up yet.", "Run:  bts setup")
+    with open(CREDS) as f:
+        return json.load(f)
+
+
+def write_private(path, data):
+    os.makedirs(DIR, mode=0o700, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(data, f, indent=2)
+    os.chmod(path, 0o600)
+
+
+def normalize_url(url):
+    url = (url or "").strip().rstrip("/")
+    if not url:
+        die("No Canvas URL given.")
+    if url.startswith("http://"):
+        die("Canvas URL must be https.", f"Try:  {url.replace('http://', 'https://', 1)}")
+    if not url.startswith("https://"):
+        url = "https://" + url
+    p = urllib.parse.urlparse(url)
+    if not p.netloc:
+        die(f"That doesn't look like a URL: {url}")
+    return f"https://{p.netloc}"
+
+
+# ───────────────────────────── http ─────────────────────────────
+
+def get(url, token, params=None):
+    if params:
+        url += ("&" if "?" in url else "?") + urllib.parse.urlencode(params, doseq=True)
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {token}", "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.loads(r.read().decode()), next_link(r.headers.get("Link", ""))
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            die("Canvas rejected the token (401).",
+                "It's wrong, expired, or revoked. Make a new one, then: bts setup")
+        if e.code == 403:
+            die("Canvas refused the request (403).",
+                "Your school may have API tokens disabled. Use the /canvas skill instead.")
+        if e.code == 404:
+            return None, None
+        die(f"Canvas returned HTTP {e.code}.")
+    except urllib.error.URLError as e:
+        die(f"Could not reach Canvas: {e.reason}", "Check the URL and your connection.")
+
+
+def next_link(header):
+    for part in header.split(","):
+        m = re.search(r'<([^>]+)>\s*;\s*rel="next"', part)
+        if m:
+            return m.group(1)
+    return None
+
+
+def get_all(base, token, path, params=None, cap=50):
+    params = dict(params or {})
+    params.setdefault("per_page", 100)
+    out, url, pages = [], base + path, 0
+    while url and pages < cap:
+        body, url = get(url, token, params if pages == 0 else None)
+        if body is None:
+            break
+        if isinstance(body, dict):
+            return body
+        out.extend(body)
+        pages += 1
+    return out
+
+
+# ───────────────────────────── shaping ─────────────────────────────
+
+def status_of(sub):
+    if not sub:
+        return "unknown"
+    if sub.get("missing"):
+        return "missing"
+    ws = sub.get("workflow_state")
+    if ws == "graded":
+        return "graded"
+    if sub.get("late"):
+        return "late"
+    if sub.get("submitted_at"):
+        return "submitted"
+    if ws in ("unsubmitted", None):
+        return "not_submitted"
+    return "unknown"
+
+
+def grade_of(course):
+    for e in course.get("enrollments") or []:
+        if e.get("type") in ("student", "StudentEnrollment") or "computed_current_score" in e:
+            score, letter = e.get("computed_current_score"), e.get("computed_current_grade")
+            if score is None and letter is None:
+                return None
+            if score is None:
+                return letter
+            return f"{score}%" + (f" ({letter})" if letter else "")
+    return None
+
+
+def parse_due(s):
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00")).astimezone()
+    except ValueError:
+        return None
+
+
+# ───────────────────────────── commands ─────────────────────────────
+
+RISK_LINES = [
+    f"{S.bold('This saves a Canvas access token on this computer.')}",
+    "",
+    f"{S.yellow('1.')} The token acts as you. It's stored at ~/.claude/canvas/",
+    f"   credentials.json, chmod 0600, {S.bold('not encrypted')}.",
+    f"{S.yellow('2.')} Never commit it, paste it in chat, or share it.",
+    f"{S.yellow('3.')} Many schools restrict or ban API tokens. {S.bold('Check your policy.')}",
+    f"{S.yellow('4.')} bts only sends GET requests — it can't change anything in",
+    f"   Canvas. But the token itself is full-access. Something else could.",
+    f"{S.yellow('5.')} {S.bold('Set an expiry date')} on the token. End of semester.",
+    f"{S.yellow('6.')} {S.bold('bts revoke')} deletes the local copy — it does NOT invalidate",
+    "   the token. Also remove it in Canvas → Approved Integrations.",
+    "",
+    f"{S.gray('The /canvas skill reads your browser instead and needs none of this.')}",
+]
+
+
+def cmd_setup(args):
+    banner()
+    box("Heads up — read this", RISK_LINES, S.yellow)
+
+    if not args.yes:
+        print()
+        try:
+            typed = input(f'  Type {S.bold(S.green("I ACCEPT"))} to continue '
+                          f'{S.gray("(anything else cancels)")}: ')
+        except (EOFError, KeyboardInterrupt):
+            print()
+            die("Cancelled.")
+        if typed.strip().upper() != "I ACCEPT":
+            print()
+            info("Cancelled — nothing was saved.")
+            print()
+            sys.exit(2)
+
+    rule("setup")
+
+    step(1, 4, "Canvas URL")
+    info("e.g. school.instructure.com  or  canvas.school.edu")
+    url = normalize_url(args.url or input(f"  {S.cyan(ARROW)} "))
+    ok(f"Using {S.bold(url)}")
+
+    step(2, 4, "Access token")
+    info("Canvas → Account → Settings → \"+ New Access Token\"")
+    info("Set an expiry date. Canvas shows the token only once.")
+    token = (args.token or os.environ.get("CANVAS_TOKEN") or "").strip()
+    if token:
+        info("Read from $CANVAS_TOKEN")
+    else:
+        token = getpass.getpass(f"  {S.cyan(ARROW)} paste it (hidden): ").strip()
+    if not token:
+        die("No token given.")
+    ok(f"Got a {len(token)}-character token {S.gray('(…' + token[-4:] + ')')}")
+
+    step(3, 4, "Verify")
+    write_private(CREDS, {
+        "canvas_url": url, "token": token,
+        "accepted_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+    })
+    with Spinner("Talking to Canvas") as sp:
+        me, _ = get(url + "/api/v1/users/self", token)
+        sp.done(f"Connected as {S.bold(me.get('name', '?'))}")
+    info(f"Token saved to {CREDS} (0600)")
+
+    step(4, 4, "First sync")
+    do_sync(url, token, None)
+
+    print()
+    box("You're set", [
+        f"{S.cyan('bts due')}      {S.gray('what is overdue and due this week')}",
+        f"{S.cyan('bts sync')}     {S.gray('refresh from Canvas')}",
+        f"{S.cyan('bts status')}   {S.gray('what is configured')}",
+        f"{S.cyan('bts revoke')}   {S.gray('delete the saved token')}",
+        "",
+        f"{S.gray('In Claude Code:')}  {S.mag('/due')}  {S.mag('/triage')}  "
+        f"{S.mag('/plan-week')}  {S.mag('/cram')}",
+    ], S.green)
+    print()
+
+
+def do_sync(base, token, only):
+    with Spinner("Fetching courses") as sp:
+        courses = get_all(base, token, "/api/v1/courses",
+                          {"enrollment_state": "active", "include[]": ["total_scores"]})
+        courses = [c for c in courses if c.get("id") and not c.get("access_restricted_by_date")]
+        sp.done(f"{len(courses)} active courses")
+
+    if only:
+        q = only.lower()
+        courses = [c for c in courses if q in (c.get("name") or "").lower()
+                   or q in (c.get("course_code") or "").lower()]
+        if not courses:
+            die(f"No active course matching {only!r}.")
+
+    out = {"pulled_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+           "canvas_url": base, "source": "api", "courses": [], "unread": []}
+
+    for c in courses:
+        cid = c["id"]
+        name = c.get("course_code") or c.get("name") or str(cid)
+        with Spinner(f"{name}") as sp:
+            raw = get_all(base, token, f"/api/v1/courses/{cid}/assignments",
+                          {"include[]": ["submission"], "order_by": "due_at"})
+            if isinstance(raw, dict):
+                raw = []
+            items = [{"title": a.get("name"), "due": a.get("due_at"),
+                      "points": a.get("points_possible"),
+                      "status": status_of(a.get("submission") or {}),
+                      "score": (a.get("submission") or {}).get("score"),
+                      "url": a.get("html_url")} for a in raw]
+            g = grade_of(c)
+            sp.done(f"{S.bold(name):<22} {len(items):>2} assignments"
+                    f"{'   ' + S.gray(g) if g else ''}")
+        out["courses"].append({"id": str(cid), "name": name, "full_name": c.get("name"),
+                               "current_grade": grade_of(c), "assignments": items})
+
+    write_private(SNAPSHOT, out)
+    total = sum(len(c["assignments"]) for c in out["courses"])
+    print()
+    ok(f"{S.bold(str(total))} assignments across {S.bold(str(len(out['courses'])))} "
+       f"courses → {S.gray(SNAPSHOT)}")
+    return out
+
+
+def cmd_sync(args):
+    c = load_creds()
+    print()
+    rule("sync")
+    do_sync(c["canvas_url"], c["token"], args.course)
+    print()
+
+
+def cmd_test(args):
+    c = load_creds()
+    print()
+    with Spinner("Checking token") as sp:
+        me, _ = get(c["canvas_url"] + "/api/v1/users/self", c["token"])
+        sp.done(f"Token works — {S.bold(me.get('name', '?'))} at {S.gray(c['canvas_url'])}")
+    print()
+
+
+def cmd_status(args):
+    print()
+    if not os.path.exists(CREDS):
+        box("Status", [
+            f"{S.yellow('Not configured')} — no token saved.",
+            "",
+            f"{S.gray('Browser mode still works:')} run {S.mag('/canvas')} in Claude Code.",
+            f"{S.gray('For the CLI:')} {S.cyan('bts setup')}",
+        ], S.yellow)
+        print()
+        return
+    c = load_creds()
+    tok = c.get("token", "")
+    mode = oct(os.stat(CREDS).st_mode & 0o777)[-3:]
+    lines = [
+        f"{fit(S.gray('canvas'), 12)}{c['canvas_url']}",
+        f"{fit(S.gray('token'), 12)}…{tok[-4:]}  {S.gray(f'({len(tok)} chars, mode {mode})')}",
+        f"{fit(S.gray('accepted'), 12)}{c.get('accepted_at', '?')}",
+    ]
+    if os.path.exists(SNAPSHOT):
+        with open(SNAPSHOT) as f:
+            snap = json.load(f)
+        when = parse_due(snap.get("pulled_at"))
+        age = ""
+        if when:
+            mins = (datetime.now(timezone.utc).astimezone() - when).total_seconds() / 60
+            age = S.gray(f"  ({int(mins)}m ago)") if mins < 90 else \
+                  S.yellow(f"  ({mins/60:.0f}h ago — run: bts sync)")
+        n = sum(len(x["assignments"]) for x in snap["courses"])
+        lines += [
+            f"{fit(S.gray('snapshot'), 12)}{snap.get('pulled_at', '?')}{age}",
+            f"{fit(S.gray('courses'), 12)}{len(snap['courses'])} courses, {n} assignments",
+            "",
+        ]
+        for x in snap["courses"]:
+            g = x.get("current_grade") or S.gray("—")
+            lines.append(f"  {fit(S.bold(x['name']), 12)}{g}")
+    else:
+        lines.append(f"{fit(S.gray('snapshot'), 12)}none — run {S.cyan('bts sync')}")
+    box("Status", lines)
+    print()
+
+
+def cmd_revoke(args):
+    print()
+    if os.path.exists(CREDS):
+        os.remove(CREDS)
+        ok(f"Deleted {CREDS}")
+    else:
+        info("No local token to delete.")
+    if args.all and os.path.exists(SNAPSHOT):
+        os.remove(SNAPSHOT)
+        ok(f"Deleted {SNAPSHOT}")
+    print()
+    box("One more step", [
+        f"{S.bold('Deleting the local file does not invalidate the token.')}",
+        "",
+        "Remove it in Canvas too:",
+        f"  {S.cyan('Account → Settings → Approved Integrations → delete')}",
+    ], S.yellow)
+    print()
+
+
+def cmd_due(args):
+    if not os.path.exists(SNAPSHOT):
+        die("No coursework saved yet.", "Run:  bts sync")
+    with open(SNAPSHOT) as f:
+        snap = json.load(f)
+
+    now = datetime.now(timezone.utc).astimezone()
+    horizon = now + timedelta(days=args.days)
+    overdue, today, tmrw, soon, undated = [], [], [], [], []
+    tomorrow = (now + timedelta(days=1)).date()
+
+    for c in snap["courses"]:
+        for a in c["assignments"]:
+            if a["status"] in ("submitted", "graded"):
+                continue
+            d = parse_due(a["due"])
+            row = (c["name"], a["title"], d, a["points"], a["status"])
+            if d is None:
+                undated.append(row)
+            elif d < now:
+                overdue.append(row)
+            elif d.date() == now.date():
+                today.append(row)
+            elif d.date() == tomorrow:
+                tmrw.append(row)
+            elif d <= horizon:
+                soon.append(row)
+
+    for g in (overdue, today, tmrw, soon):
+        g.sort(key=lambda r: r[2])
+
+    print()
+    if not (overdue or today or tmrw or soon or undated):
+        ok(f"Nothing due in the next {args.days} days.")
+        print()
+        return
+
+    def show(rows, fmt):
+        for course, title, d, pts, st in rows:
+            when = fmt(d)
+            tag = ""
+            if st == "missing":
+                tag = "  " + S.red("missing")
+            elif st == "late":
+                tag = "  " + S.yellow("late")
+            p = S.gray(f"{pts:g} pts") if pts else S.gray("—")
+            print(f"    {fit(S.bold(course), 10)}  {fit(title, 32)}  "
+                  f"{fit(when, 11)}  {fit(p, 7, right=True)}{tag}")
+
+    if overdue:
+        print("  " + S.red(S.bold(f"OVERDUE ({len(overdue)})")))
+        show(overdue, lambda d: S.red(d.strftime("%b %-d")))
+    if today:
+        print()
+        print("  " + S.yellow(S.bold("TODAY")))
+        show(today, lambda d: S.yellow(d.strftime("%-I:%M%p").lower()))
+    if tmrw:
+        print()
+        print("  " + S.yellow(S.bold("TOMORROW")))
+        show(tmrw, lambda d: S.yellow(d.strftime("%-I:%M%p").lower()))
+    if soon:
+        print()
+        print("  " + S.cyan(S.bold(f"NEXT {args.days} DAYS")))
+        show(soon, lambda d: d.strftime("%a %b %-d"))
+    if undated:
+        print()
+        print("  " + S.gray(S.bold("NO DUE DATE")))
+        show(undated, lambda d: S.gray("—"))
+
+    total = len(overdue) + len(today) + len(tmrw) + len(soon)
+    print()
+    if total >= 8:
+        info(f"{total} items. Run {S.mag('/triage')} in Claude Code to rank them.")
+    print()
+
+
+def main():
+    p = argparse.ArgumentParser(prog="bts", description=__doc__,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--version", action="version", version=f"bts {VERSION}")
+    sub = p.add_subparsers(dest="cmd")
+
+    s = sub.add_parser("setup", help="guided setup")
+    s.add_argument("--url")
+    s.add_argument("--token", help="prefer $CANVAS_TOKEN — argv is visible in ps")
+    s.add_argument("-y", "--yes", action="store_true", help="skip the risk prompt")
+    s.set_defaults(func=cmd_setup)
+
+    s = sub.add_parser("sync", help="pull coursework from Canvas")
+    s.add_argument("--course", help="only courses matching this name/code")
+    s.set_defaults(func=cmd_sync)
+
+    s = sub.add_parser("due", help="what's overdue and coming up")
+    s.add_argument("-d", "--days", type=int, default=7)
+    s.set_defaults(func=cmd_due)
+
+    sub.add_parser("test", help="verify the token").set_defaults(func=cmd_test)
+    sub.add_parser("status", help="show config").set_defaults(func=cmd_status)
+
+    s = sub.add_parser("revoke", help="delete the saved token")
+    s.add_argument("--all", action="store_true", help="also delete the coursework snapshot")
+    s.set_defaults(func=cmd_revoke)
+
+    args = p.parse_args()
+    if not args.cmd:
+        banner()
+        p.print_help()
+        print()
+        return
+    try:
+        args.func(args)
+    except KeyboardInterrupt:
+        print()
+        info("Cancelled.")
+        sys.exit(130)
+    except BrokenPipeError:
+        # piped into `head` or similar — exit quietly
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

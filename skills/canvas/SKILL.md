@@ -18,7 +18,7 @@ mode. Just run the script and skip everything below — it's 3 seconds instead
 of a minute:
 
 ```bash
-python3 ~/.claude/skills/canvas/scripts/canvas-api.py pull
+bts sync
 ```
 
 Then jump to **Report back**. If it errors, fall through to browser mode and
