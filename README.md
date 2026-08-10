@@ -1,6 +1,6 @@
 # Back to School — Claude Skills for Students
 
-Ten skills plus a CLI that turn Claude into something actually useful during a semester.
+Eleven skills plus a CLI that turn Claude into something actually useful during a semester.
 Install once, then type `/due`, `/triage`, `/cram` and go.
 
 It reads your real Canvas assignments, so the plans are about your actual
@@ -13,6 +13,7 @@ good at that thing would actually follow.
 |--------------|--------------|
 | `/canvas`    | Pulls your assignments, due dates, and grades out of Canvas via your logged-in browser. No token, no password. |
 | `/canvas-dev`| Opt-in: direct Canvas API access with your own token. Faster, but you accept the risks. |
+| `/packet`    | Builds a study packet from your teacher's slides and your graded work — active recall, not a wall of notes. |
 | `/due`       | "What's due?" in five seconds. Overdue first, then the week. Nothing else. |
 | `/triage`    | Your whole workload → one ranked do-this-next list. Tells you when it doesn't fit. |
 | `/plan-week` | A weekly schedule with slack built in, so it survives past Tuesday. |
@@ -40,6 +41,17 @@ cp -R skills/* ~/.claude/skills/
 install -m 755 bin/bts ~/.local/bin/bts
 ```
 
+### Try it right now — no Canvas needed
+
+```bash
+bts demo     # loads a fake semester, dated relative to today
+bts          # start chatting about it
+```
+
+You get five courses with real-looking grades, three overdue assignments, a
+problem set due tomorrow and a midterm in eleven days. Clear it any time with
+`bts revoke --all`.
+
 ### The CLI
 
 Just run `bts`. It opens a chat:
@@ -50,27 +62,31 @@ Just run `bts`. It opens a chat:
   ✓ 5 courses, 22 assignments loaded
   Ask anything. /help for commands, /exit to quit.
 
-❯ what should i work on tonight
+❯ i have a chem midterm coming up and im behind, what do i do
 
-  Tonight's biggest fire: CHEM 240 Problem set 3 is due tomorrow (Tue Aug 11,
-  11:59pm) — start there.
+  Midterm's Aug 21 — 11 days out, not a same-night cram. Bigger fires first:
 
-  Also worth squeezing in, since CHEM 240 is your weakest grade (76.2%, C):
-  • Lab safety module — missing, only 15 pts, likely quick
-  • Lab 1: Microscopy writeup (BIOL 201) — missing, 50 pts, overdue since Fri
+  • PS3 (40 pts) due tomorrow 11:59pm, not started
+  • PS2 already late — penalty grows the longer it sits, do it before PS3
+  • Lab safety module (15 pts) missing — worth 20 min to check if late
+    credit's still open before writing it off
+  • Grade's 76.2% C — the problem sets are dragging it, not the midterm yet
 
-  If you want this as a time-blocked plan, /plan-week can do that.
-
-❯ i only have 3 hours after dinner, whats realistic
+  What's covered on the midterm, and is there a study guide posted? Once I
+  know that I can build you a study packet targeting what you're weak on —
+  20 min gets you the highest-yield topic, an hour covers the rest.
 ```
+
+That's verbatim output, not a mockup.
 
 It knows your actual courses, grades, and deadlines, and it remembers the
 conversation. Inside the chat:
 
 ```
 /due       show the assignment list      /new    fresh conversation
-/sync      refresh from Canvas           /help   commands
-/status    what's configured             /exit   quit
+/packet    build a study packet          /help   commands
+/sync      refresh from Canvas           /exit   quit
+/status    what's configured
 ```
 
 Any *other* slash command is handed straight to Claude, so `/tutor`,
@@ -81,9 +97,9 @@ Prefer one-shot? Every command also works directly:
 
 ```
 bts ask "when is my chem midterm"
+bts packet "chem 240 midterm, ch 1-7"
 bts due                    # just the list, no chat
-bts sync                   # refresh coursework
-bts setup / status / revoke
+bts demo / sync / setup / status / revoke
 ```
 
 **Chat needs the [`claude` CLI](https://claude.com/claude-code)** — it wraps
@@ -233,6 +249,30 @@ shows it once. Never paste it into a chat, a repo, or a command line argument
 Stdlib Python only, no dependencies, one file. Read it before you run it:
 [`bin/bts`](bin/bts).
 
+## Why it doesn't just tell you to go study
+
+The default failure mode of every study tool is handing back a block of time.
+"Set aside 5 hours for the chem midterm" is useless — you already knew you
+should study, and nobody volunteers for a 5-hour block.
+
+So `bts` is built around two rules:
+
+**Offer to make the thing, don't assign the time.** The answer to "I'm behind
+in chem" is a study packet built from that professor's slides and the problem
+sets you already lost points on — not a number of hours.
+
+**Every estimate is two-tier, floor first.** "20 minutes gets you titrations,
+which is where you're actually losing points. The other three topics need
+another hour." The floor has to be real and under 30 minutes, and it has to
+say honestly what it doesn't cover.
+
+`/packet` is where this pays off. It builds a single self-contained HTML file:
+one question on screen at a time, answers hidden until you commit, missed
+cards come back, visible progress, and a brain-dump sheet at the end. Weighted
+toward the questions you already got wrong, because those are worth more than
+anything else you could review. It defaults to a 20-minute core set, with a
+full set behind a toggle.
+
 ## A note on `/draft`
 
 `/draft` produces drafts, and every draft it produces ends with a required
@@ -249,6 +289,7 @@ rubric — do that part.
 ```
 back-to-school-skills/
 ├── skills/
+│   ├── packet/SKILL.md            <- builds the HTML study packets
 │   ├── canvas/SKILL.md            <- browser mode, writes the snapshot
 │   ├── canvas-dev/SKILL.md        <- opt-in API mode
 │   ├── due/SKILL.md

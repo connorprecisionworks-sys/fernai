@@ -6,6 +6,8 @@ Just run `bts` to start talking. Ask about your classes, get tutored, work out
 what to do tonight.
 
   bts              chat (default)
+  bts demo         load a fake semester and try it without Canvas
+  bts packet       build a study packet from your course materials
   bts ask "..."    one question, one answer
   bts due          what's overdue and what's this week
   bts sync         refresh coursework from Canvas
@@ -35,7 +37,7 @@ from datetime import datetime, timedelta, timezone
 DIR = os.path.expanduser("~/.claude/canvas")
 CREDS = os.path.join(DIR, "credentials.json")
 SNAPSHOT = os.path.join(DIR, "snapshot.json")
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 
 
 # ───────────────────────────── style ─────────────────────────────
@@ -595,28 +597,262 @@ def cmd_due(args):
     print()
 
 
+# ─────────────────────────── demo data ───────────────────────────
+
+DEMO_SEMESTER = {'pulled_at': None,
+ 'canvas_url': 'https://demo.instructure.com',
+ 'source': 'demo',
+ 'unread': [],
+ 'courses': [{'id': '101',
+              'name': 'BIOL 201',
+              'full_name': 'General Biology II',
+              'current_grade': '88.4% (B+)',
+              'assignments': [{'title': 'Syllabus quiz',
+                               '_due_offset_days': -7,
+                               '_due_time': [23, 59],
+                               'points': 10,
+                               'status': 'graded',
+                               'score': 10,
+                               'url': None},
+                              {'title': 'Lab 1: Microscopy writeup',
+                               '_due_offset_days': -3,
+                               '_due_time': [23, 59],
+                               'points': 50,
+                               'status': 'missing',
+                               'score': None,
+                               'url': None},
+                              {'title': 'Lab 2: Cell division writeup',
+                               '_due_offset_days': 4,
+                               '_due_time': [23, 59],
+                               'points': 50,
+                               'status': 'not_submitted',
+                               'score': None,
+                               'url': None},
+                              {'title': 'Discussion board wk3',
+                               '_due_offset_days': 6,
+                               '_due_time': [23, 59],
+                               'points': 10,
+                               'status': 'not_submitted',
+                               'score': None,
+                               'url': None},
+                              {'title': 'Exam 1 (in class)',
+                               '_due_offset_days': 9,
+                               '_due_time': [14, 0],
+                               'points': 150,
+                               'status': 'not_submitted',
+                               'score': None,
+                               'url': None}]},
+             {'id': '102',
+              'name': 'CHEM 240',
+              'full_name': 'Organic Chemistry I',
+              'current_grade': '76.2% (C)',
+              'assignments': [{'title': 'Problem set 1',
+                               '_due_offset_days': -6,
+                               '_due_time': [23, 59],
+                               'points': 40,
+                               'status': 'graded',
+                               'score': 26,
+                               'url': None},
+                              {'title': 'Lab safety module',
+                               '_due_offset_days': -4,
+                               '_due_time': [23, 59],
+                               'points': 15,
+                               'status': 'missing',
+                               'score': None,
+                               'url': None},
+                              {'title': 'Problem set 2',
+                               '_due_offset_days': -1,
+                               '_due_time': [23, 59],
+                               'points': 40,
+                               'status': 'late',
+                               'score': None,
+                               'url': None},
+                              {'title': 'Problem set 3',
+                               '_due_offset_days': 1,
+                               '_due_time': [23, 59],
+                               'points': 40,
+                               'status': 'not_submitted',
+                               'score': None,
+                               'url': None},
+                              {'title': 'Midterm 1',
+                               '_due_offset_days': 11,
+                               '_due_time': [13, 0],
+                               'points': 200,
+                               'status': 'not_submitted',
+                               'score': None,
+                               'url': None}]},
+             {'id': '103',
+              'name': 'HIST 110',
+              'full_name': 'US History to 1877',
+              'current_grade': '93.0% (A)',
+              'assignments': [{'title': 'Reading response 2',
+                               '_due_offset_days': -5,
+                               '_due_time': [23, 59],
+                               'points': 15,
+                               'status': 'graded',
+                               'score': 14,
+                               'url': None},
+                              {'title': 'Reading response 3',
+                               '_due_offset_days': 2,
+                               '_due_time': [23, 59],
+                               'points': 15,
+                               'status': 'not_submitted',
+                               'score': None,
+                               'url': None},
+                              {'title': 'Primary source analysis',
+                               '_due_offset_days': 7,
+                               '_due_time': [23, 59],
+                               'points': 100,
+                               'status': 'not_submitted',
+                               'score': None,
+                               'url': None},
+                              {'title': 'Term paper proposal',
+                               '_due_offset_days': 18,
+                               '_due_time': [23, 59],
+                               'points': 50,
+                               'status': 'not_submitted',
+                               'score': None,
+                               'url': None}]},
+             {'id': '104',
+              'name': 'MATH 231',
+              'full_name': 'Linear Algebra',
+              'current_grade': '81.5% (B-)',
+              'assignments': [{'title': 'Homework 1',
+                               '_due_offset_days': -5,
+                               '_due_time': [23, 59],
+                               'points': 25,
+                               'status': 'graded',
+                               'score': 20,
+                               'url': None},
+                              {'title': 'Homework 2',
+                               '_due_offset_days': 2,
+                               '_due_time': [23, 59],
+                               'points': 25,
+                               'status': 'not_submitted',
+                               'score': None,
+                               'url': None},
+                              {'title': 'Quiz 1 (online)',
+                               '_due_offset_days': 3,
+                               '_due_time': [23, 59],
+                               'points': 30,
+                               'status': 'not_submitted',
+                               'score': None,
+                               'url': None},
+                              {'title': 'Homework 3',
+                               '_due_offset_days': 9,
+                               '_due_time': [23, 59],
+                               'points': 25,
+                               'status': 'not_submitted',
+                               'score': None,
+                               'url': None}]},
+             {'id': '105',
+              'name': 'ENGL 205',
+              'full_name': 'Technical Writing',
+              'current_grade': None,
+              'assignments': [{'title': 'Intro post',
+                               '_due_offset_days': -6,
+                               '_due_time': [23, 59],
+                               'points': 5,
+                               'status': 'submitted',
+                               'score': None,
+                               'url': None},
+                              {'title': 'Memo assignment',
+                               '_due_offset_days': 3,
+                               '_due_time': [23, 59],
+                               'points': 60,
+                               'status': 'not_submitted',
+                               'score': None,
+                               'url': None},
+                              {'title': 'Peer review of memo',
+                               '_due_offset_days': 6,
+                               '_due_time': [23, 59],
+                               'points': 20,
+                               'status': 'not_submitted',
+                               'score': None,
+                               'url': None},
+                              {'title': 'Resume draft',
+                               '_due_offset_days': None,
+                               '_due_time': None,
+                               'points': 40,
+                               'status': 'not_submitted',
+                               'score': None,
+                               'url': None}]}]}
+
+
 # ───────────────────────────── chat ─────────────────────────────
 
 HISTFILE = os.path.join(DIR, "history")
 
 PERSONA = """You are the assistant inside `bts`, a terminal tool a student uses for school.
 
-Style: direct, brief, no filler. You are writing into a narrow terminal, so:
-no markdown headers, no bold/italic markers, no tables wider than 76 columns,
-no emoji. Short paragraphs and simple dashed lists only. Never open with
-"Great question" or similar. Don't offer encouragement unless asked.
+## The one rule that matters
 
-You have the student's real coursework below. Use it. Refer to assignments by
-their exact course code and title. If you need something it doesn't contain
-(how long a task takes, what they've already done, their work schedule), ask
-one short question rather than assuming.
+**Never hand back a block of time as the answer.** "Study chem for 5 hours" is
+useless advice — the student already knows they should study, and nobody
+voluntarily signs up for a 5-hour block. It also gives them nothing to *do*.
 
-If they ask what's due, answer from the coursework directly — do not tell them
-to run a command.
+Instead, offer to make the thing that shortens the work, and give two numbers:
 
-Their toolkit also has skills for deeper work: /tutor, /triage, /plan-week,
-/cram, /draft, /email, /learn. If one clearly fits what they're asking for,
-mention it in one short line at the end. Don't pitch more than one."""
+    BAD:   "Set aside 5 hours to review chapters 1-7 for the CHEM midterm."
+    GOOD:  "I can build you a study packet from the lecture slides and your
+            graded problem sets — mostly questions, answers hidden.
+            20 minutes with it gets you the concepts you're actually losing
+            points on. An hour and you'd be solid. Want it?"
+
+Every estimate you give is two-tier, and you lead with the floor:
+- **the minimum that genuinely helps** — must be under 30 minutes
+- the better version, second, in the same breath
+
+The floor must be real, not a lie to be encouraging. If 20 minutes only covers
+one topic out of four, say that: "20 minutes gets you titrations, which is
+where you lost the most points. The other three need another hour."
+
+## Always end with a thing you can do for them
+
+Your answers end with an offer or a physical action, never with an
+instruction to go feel motivated. Things you can actually make:
+
+- a **study packet** — say `/packet` and describe what would go in it
+- a plan with named blocks — `/plan-week`
+- a ranked order to work through — `/triage`
+- a tutoring session on one concept — `/tutor`
+- a draft to react to — `/draft`
+- an email to a professor — `/email`
+
+Offer exactly one, the one that fits. Never list options like a menu.
+
+If there's genuinely nothing to make, then the next step is a *physical*
+action, small enough that refusing it feels silly: "open the lab doc and write
+the hypothesis sentence" — not "start the lab report."
+
+## Timing and assignment management
+
+You are good at this and specific about it. When you estimate:
+
+- Use their real point values and grades to say what's worth the time. A 15
+  pt missing module on a 76% class beats a 50 pt assignment on a 93% class.
+- Name what to *skip* or do at 70%. Every plan should say what gets dropped.
+- Anything already missing/past due: check whether late credit is still
+  possible before treating it as sunk. Say "worth 20 min to check" if unclear.
+- Never plan more than ~3 hours of focused work in one evening. Beyond that
+  the estimates are fiction and they'll bounce off the whole plan.
+- Deadlines within 24h outrank point value. After that, points per hour wins.
+
+## Style
+
+Terminal output, so: no markdown headers, no tables, no emoji, nothing wider
+than 76 columns. Short lines. Front-load the answer.
+
+Under 10 lines before the offer. If you're writing a twelfth line you've
+already lost them — that's the "attention keeping" bar and it applies to you,
+not just to the study material.
+
+Never open with "Great question." No encouragement unless they ask. No
+"you've got this."
+
+Use their real coursework below. Exact course codes and titles. If you need
+something it doesn't contain — how long a task takes, what they've already
+studied, their work schedule — ask ONE short question, then answer."""
 
 
 def coursework_context():
@@ -815,6 +1051,7 @@ def ask_claude(prompt, session_id=None, stream=True):
 
 CHAT_HELP = [
     f"{S.cyan('/due')}       what's overdue and coming up",
+    f"{S.cyan('/packet')}    build a study packet for a test",
     f"{S.cyan('/sync')}      refresh coursework from Canvas",
     f"{S.cyan('/status')}    what's configured",
     f"{S.cyan('/new')}       start a fresh conversation",
@@ -852,7 +1089,8 @@ def cmd_chat(args):
         n = sum(len(c["assignments"]) for c in snap["courses"])
         info(f"{len(snap['courses'])} courses, {n} assignments loaded")
     else:
-        warn("No coursework synced — run /sync to pull it in.")
+        warn("No coursework synced. Run `bts demo` to try it with fake data,")
+        warn("or `bts setup` / `/canvas` to pull in your real classes.")
     info(f"Ask anything. {S.cyan('/help')} for commands, {S.cyan('/exit')} to quit.")
     print()
 
@@ -917,6 +1155,55 @@ def cmd_chat(args):
     print()
 
 
+def cmd_demo(args):
+    """Load a fake but realistic semester so you can try bts without Canvas."""
+    import copy
+    data = copy.deepcopy(DEMO_SEMESTER)
+
+    now = datetime.now().astimezone()
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    for c in data["courses"]:
+        for a in c["assignments"]:
+            off = a.pop("_due_offset_days", None)
+            hhmm = a.pop("_due_time", None) or [23, 59]
+            a["due"] = None if off is None else \
+                (midnight + timedelta(days=off, hours=hhmm[0], minutes=hhmm[1])).isoformat()
+    data["pulled_at"] = now.isoformat(timespec="seconds")
+
+    if os.path.exists(SNAPSHOT) and not args.force:
+        with open(SNAPSHOT) as f:
+            existing = json.load(f)
+        if existing.get("source") != "demo":
+            die("You already have real coursework synced.",
+                "`bts demo --force` overwrites it. To keep a copy first:\n"
+                f"    cp {SNAPSHOT} ~/coursework-backup.json")
+
+    write_private(SNAPSHOT, data)
+    n = sum(len(c["assignments"]) for c in data["courses"])
+    print()
+    box("Demo semester loaded", [
+        f"{len(data['courses'])} courses, {n} assignments — dated relative to today, so",
+        "there's always something overdue and something due tomorrow.",
+        "",
+        f"{S.cyan('bts')}          start chatting about it",
+        f"{S.cyan('bts due')}      see the list",
+        f"{S.cyan('bts packet')}   build a study packet for the CHEM midterm",
+        "",
+        f"{S.gray('Fake data. Nothing is connected to a real Canvas.')}",
+        f"{S.gray('Clear it with:')} {S.cyan('bts revoke --all')}",
+    ], S.green)
+    print()
+
+
+def cmd_packet(args):
+    if not have_claude():
+        die("`bts packet` needs the `claude` CLI.")
+    what = " ".join(args.about) if args.about else ""
+    print()
+    ask_claude(f"/packet {what}".strip(), None)
+    print()
+
+
 def cmd_ask(args):
     if not have_claude():
         die("`bts ask` needs the `claude` CLI.", "Try:  bts due")
@@ -957,6 +1244,14 @@ def main():
     s = sub.add_parser("ask", help="one question, one answer")
     s.add_argument("question", nargs="+")
     s.set_defaults(func=cmd_ask)
+
+    s = sub.add_parser("packet", help="build a study packet")
+    s.add_argument("about", nargs="*", help="course + what it covers")
+    s.set_defaults(func=cmd_packet)
+
+    s = sub.add_parser("demo", help="load a fake semester to try this out")
+    s.add_argument("-f", "--force", action="store_true", help="overwrite real coursework")
+    s.set_defaults(func=cmd_demo)
 
     args = p.parse_args()
     if not args.cmd:
