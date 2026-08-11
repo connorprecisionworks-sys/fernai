@@ -38,7 +38,7 @@ from datetime import datetime, timedelta, timezone
 DIR = os.path.expanduser("~/.claude/canvas")
 CREDS = os.path.join(DIR, "credentials.json")
 SNAPSHOT = os.path.join(DIR, "snapshot.json")
-VERSION = "1.5.1"
+VERSION = "1.6.0"
 
 
 # ───────────────────────────── style ─────────────────────────────

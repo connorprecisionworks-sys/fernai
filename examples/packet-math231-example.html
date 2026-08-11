@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MATH 231 — Quiz 1 packet</title>
+<style>
+:root{
+  --bg:#0e1116; --panel:#151a22; --line:#232b36; --fg:#e6edf3; --dim:#93a1b1;
+  --cyan:#5fd7d7; --green:#7ee787; --red:#ff7b72; --amber:#ffd75f; --violet:#d2a8ff;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--fg);
+  font:19px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;min-height:100vh;
+}
+.notice{
+  background:#3d2f0b;color:var(--amber);border-bottom:1px solid #5a4610;
+  padding:9px 20px;font-size:13.5px;text-align:center;line-height:1.5;
+}
+header{
+  padding:14px 20px;border-bottom:1px solid var(--line);background:var(--panel);
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:5;
+}
+.brand{font:700 14px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--cyan);
+  letter-spacing:.5px;white-space:nowrap}
+.brand small{display:block;color:var(--dim);font-weight:400;letter-spacing:0}
+.bar{flex:1 1 220px;height:7px;background:#0a0d12;border-radius:99px;overflow:hidden;min-width:140px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#5fd7d7,#7ee787);
+  border-radius:99px;transition:width .3s ease}
+.count{font:600 13px ui-monospace,Menlo,monospace;color:var(--dim);white-space:nowrap}
+.modes{display:flex;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.modes button{
+  background:transparent;border:0;color:var(--dim);padding:6px 13px;cursor:pointer;
+  font:600 12.5px ui-monospace,Menlo,monospace}
+.modes button.on{background:var(--cyan);color:#05202a}
+.ghost{background:transparent;border:1px solid var(--line);color:var(--dim);
+  border-radius:8px;padding:6px 12px;cursor:pointer;font:600 12.5px ui-monospace,Menlo,monospace}
+.ghost:hover{color:var(--fg);border-color:var(--dim)}
+
+main{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:34px 20px 130px}
+.card{width:100%;max-width:760px}
+
+.tag{display:inline-block;font:600 11.5px ui-monospace,Menlo,monospace;letter-spacing:.7px;
+  text-transform:uppercase;padding:4px 10px;border-radius:6px;margin-bottom:20px}
+.t-work{background:#0d2f38;color:var(--cyan)}
+.t-disc{background:#2b2140;color:var(--violet)}
+.t-recall{background:#12301c;color:var(--green)}
+.t-missed{background:#3d1a17;color:var(--red)}
+
+.q{font-size:25px;line-height:1.5;font-weight:600;margin:0 0 8px}
+.sub{color:var(--dim);font-size:16px;margin:0 0 26px}
+
+.nudge{color:var(--dim);font-size:14.5px;font-style:italic;margin:26px 0 0;
+  padding-top:16px;border-top:1px dashed var(--line)}
+
+.step{
+  border-left:3px solid var(--cyan);background:#111820;border-radius:0 10px 10px 0;
+  padding:15px 20px;margin:16px 0;animation:in .22s ease}
+.step h4{margin:0 0 8px;font:700 12.5px ui-monospace,Menlo,monospace;
+  color:var(--cyan);letter-spacing:.6px;text-transform:uppercase}
+.step .b{margin:9px 0}
+.step .b>*:first-child{margin-top:0}
+.step.final{border-left-color:var(--green)}
+.step.final h4{color:var(--green)}
+.step.why{border-left-color:var(--amber);background:#1b1710}
+.step.why h4{color:var(--amber)}
+@keyframes in{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+
+.miss{border-left:3px solid var(--red);background:#1d1211;padding:15px 20px;
+  border-radius:0 10px 10px 0;margin:16px 0}
+.miss h4{margin:0 0 8px;font:700 12.5px ui-monospace,Menlo,monospace;color:var(--red);
+  letter-spacing:.6px;text-transform:uppercase}
+.miss .b{margin:9px 0}
+
+/* ---- math ---- */
+.m{display:inline-block;position:relative;padding:.34em .62em;vertical-align:middle;margin:0 .12em}
+.m::before,.m::after{content:"";position:absolute;top:0;bottom:0;width:.34em;
+  border:2px solid var(--fg);border-radius:1px}
+.m::before{left:0;border-right:0}
+.m::after{right:0;border-left:0}
+.m table{border-collapse:collapse}
+.m td{padding:.1em .44em;text-align:center;font:17px/1.45 ui-monospace,Menlo,monospace}
+.m.aug td.divider{border-left:1.5px dashed var(--dim);padding-left:.62em}
+.mono{font:17px ui-monospace,SFMono-Regular,Menlo,monospace;
+  background:#0a0d12;padding:1px 7px;border-radius:5px;color:var(--cyan)}
+.hl{color:var(--amber);font-weight:700}
+.gd{color:var(--green);font-weight:700}
+.bd{color:var(--red);font-weight:700}
+.frac{display:inline-flex;flex-direction:column;vertical-align:middle;
+  text-align:center;font-size:.82em;line-height:1.15;margin:0 .18em}
+.frac b{border-bottom:1.5px solid currentColor;padding:0 .3em;font-weight:400}
+.frac i{padding:0 .3em;font-style:normal}
+.vgrp{display:inline-flex;align-items:center;gap:.3em;margin-right:1.6em;
+  font:17px ui-monospace,Menlo,monospace;color:var(--dim)}
+figure{margin:22px 0;text-align:center}
+figure svg{max-width:100%;height:auto}
+figcaption{color:var(--dim);font-size:14px;margin-top:9px}
+
+.opts{list-style:none;padding:0;margin:22px 0 0}
+.opts li{background:var(--panel);border:1px solid var(--line);border-radius:9px;
+  padding:12px 16px;margin-bottom:9px;font-size:17.5px}
+
+/* ---- footer / keys ---- */
+footer{position:fixed;bottom:0;left:0;right:0;background:var(--panel);
+  border-top:1px solid var(--line);padding:13px 20px;display:flex;gap:11px;
+  align-items:center;justify-content:center;flex-wrap:wrap}
+.key{background:var(--bg);border:1px solid var(--line);border-radius:7px;
+  padding:8px 15px;cursor:pointer;color:var(--fg);
+  font:600 13.5px ui-monospace,Menlo,monospace}
+.key:hover{border-color:var(--dim)}
+.key kbd{color:var(--dim);font-weight:400;margin-right:7px}
+.key.ok{border-color:#2b5a35;color:var(--green)}
+.key.no{border-color:#5a2b2b;color:var(--red)}
+.key.primary{background:var(--cyan);color:#05202a;border-color:var(--cyan)}
+
+/* ---- end + dump ---- */
+.end h2{font-size:30px;margin:0 0 6px}
+.leak{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:20px 24px;margin:22px 0}
+.leak ol{margin:12px 0 0;padding-left:22px}
+.leak li{margin:7px 0}
+.dump{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:22px 26px;margin:18px 0}
+.dump h3{margin:0 0 4px;font-size:18px;color:var(--cyan)}
+.dump .row{display:flex;gap:14px;padding:9px 0;border-bottom:1px solid var(--line);
+  font-size:16.5px;align-items:baseline;flex-wrap:wrap}
+.dump .row:last-child{border-bottom:0}
+.dump .row b{min-width:180px;color:var(--dim);font-weight:600;font-size:14.5px}
+.hidden{display:none}
+@media (max-width:620px){
+  body{font-size:17px}.q{font-size:21px}main{padding:24px 15px 150px}
+  .dump .row b{min-width:auto}
+}
+</style>
+</head>
+<body>
+
+<div class="notice" id="notice">
+  <b>Demo packet.</b> Built from standard linear-algebra content, not from a real
+  MATH 231 course. The <span style="color:var(--red)">missed-it</span> cards use the
+  graded score in the demo data (Homework 1 — 20/25) but the specific questions are
+  illustrative. A real packet is built from your professor's slides and your returned work.
+</div>
+
+<header>
+  <div class="brand">MATH 231 · Quiz 1<small>Linear Algebra — systems, matrices, determinants</small></div>
+  <div class="bar"><i id="prog"></i></div>
+  <div class="count" id="count">1 / 14</div>
+  <div class="modes">
+    <button id="m20" class="on">20 min</button>
+    <button id="mfull">full</button>
+  </div>
+  <button class="ghost" id="bdump">brain dump</button>
+</header>
+
+<main><div class="card" id="card"></div></main>
+
+<footer id="foot"></footer>
+
+<script>
+const M = (rows, aug) => {
+  const body = rows.map(r => '<tr>' + r.map((c,i) =>
+    `<td class="${aug && i===aug ? 'divider' : ''}">${c}</td>`).join('') + '</tr>').join('');
+  return `<span class="m ${aug!==undefined?'aug':''}"><table>${body}</table></span>`;
+};
+const V = col => M(col.map(x => [x]));
+const F = (a,b) => `<span class="frac"><b>${a}</b><i>${b}</i></span>`;
+const C = s => `<span class="mono">${s}</span>`;
+
+/* ---------- diagrams ---------- */
+const svgSpan = `
+<svg viewBox="0 0 380 210" width="380" role="img" aria-label="Two vectors spanning a plane">
+  <defs><marker id="a1" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+    <path d="M0,0 L9,4.5 L0,9 z" fill="#5fd7d7"/></marker>
+    <marker id="a2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+    <path d="M0,0 L9,4.5 L0,9 z" fill="#d2a8ff"/></marker></defs>
+  <path d="M40 170 L330 120 L340 60 L50 110 Z" fill="#5fd7d7" opacity=".10"/>
+  <line x1="20" y1="185" x2="360" y2="185" stroke="#232b36" stroke-width="1.5"/>
+  <line x1="40" y1="200" x2="40" y2="20" stroke="#232b36" stroke-width="1.5"/>
+  <line x1="40" y1="170" x2="200" y2="140" stroke="#5fd7d7" stroke-width="2.5" marker-end="url(#a1)"/>
+  <line x1="40" y1="170" x2="95" y2="80" stroke="#d2a8ff" stroke-width="2.5" marker-end="url(#a2)"/>
+  <text x="205" y="136" fill="#5fd7d7" font-size="15" font-family="monospace">v₁</text>
+  <text x="99" y="76" fill="#d2a8ff" font-size="15" font-family="monospace">v₂</text>
+  <text x="250" y="95" fill="#93a1b1" font-size="14" font-family="monospace">span{v₁,v₂}</text>
+</svg>`;
+
+const svgLines = (kind) => {
+  const pairs = {
+    one:  [['30,160 330,50','#5fd7d7'],['30,60 330,150','#d2a8ff']],
+    none: [['30,150 330,60','#5fd7d7'],['30,180 330,90','#d2a8ff']],
+    inf:  [['30,155 330,55','#5fd7d7'],['30,155 330,55','#d2a8ff']]
+  }[kind];
+  return `<svg viewBox="0 0 360 200" width="330">
+    <line x1="15" y1="180" x2="345" y2="180" stroke="#232b36" stroke-width="1.5"/>
+    <line x1="30" y1="195" x2="30" y2="15" stroke="#232b36" stroke-width="1.5"/>
+    ${pairs.map(([p,c],i)=>`<polyline points="${p}" fill="none" stroke="${c}"
+      stroke-width="${kind==='inf'&&i===1?'2.5':'2.5'}"
+      stroke-dasharray="${kind==='inf'&&i===1?'7 6':'0'}"/>`).join('')}
+    ${kind==='one'?'<circle cx="180" cy="105" r="6" fill="#7ee787"/>':''}
+  </svg>`;
+};
+
+const svgEigen = `
+<svg viewBox="0 0 380 200" width="380">
+  <defs><marker id="e1" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+    <path d="M0,0 L9,4.5 L0,9 z" fill="#93a1b1"/></marker>
+    <marker id="e2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+    <path d="M0,0 L9,4.5 L0,9 z" fill="#7ee787"/></marker>
+    <marker id="e3" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+    <path d="M0,0 L9,4.5 L0,9 z" fill="#ff7b72"/></marker></defs>
+  <line x1="20" y1="150" x2="360" y2="150" stroke="#232b36" stroke-width="1.5"/>
+  <line x1="60" y1="185" x2="60" y2="15" stroke="#232b36" stroke-width="1.5"/>
+  <line x1="60" y1="150" x2="150" y2="90" stroke="#93a1b1" stroke-width="2" marker-end="url(#e1)"/>
+  <text x="150" y="86" fill="#93a1b1" font-size="14" font-family="monospace">x</text>
+  <line x1="60" y1="150" x2="240" y2="30" stroke="#7ee787" stroke-width="2.5" marker-end="url(#e2)"/>
+  <text x="243" y="28" fill="#7ee787" font-size="14" font-family="monospace">Ax = 2x</text>
+  <line x1="60" y1="150" x2="300" y2="130" stroke="#ff7b72" stroke-width="2" marker-end="url(#e3)"/>
+  <text x="230" y="122" fill="#ff7b72" font-size="14" font-family="monospace">Ay (not parallel to y)</text>
+  <line x1="60" y1="150" x2="180" y2="165" stroke="#ff7b72" stroke-width="1.6"
+        stroke-dasharray="5 5"/>
+  <text x="120" y="182" fill="#93a1b1" font-size="13" font-family="monospace">y</text>
+</svg>`;
+
+/* ---------- cards ---------- */
+const CARDS = [
+
+{tier:'core',topic:'Row reduction',type:'work',
+ q:'Solve the system with Gaussian elimination.',
+ body: M([['1','2','−1','3'],['2','5','−1','8'],['−1','−1','4','1']],3),
+ nudge:'Work it fully before revealing. Aim for reduced row echelon form.',
+ steps:[
+  ['Kill the entries below the first pivot',
+   `R₂ → R₂ − 2R₁ and R₃ → R₃ + R₁. The pivot is the <span class="hl">1</span> in
+    the top-left, so no scaling needed first.<br><br>` +
+   M([['1','2','−1','3'],['0','1','1','2'],['0','1','3','4']],3)],
+  ['Clear below the second pivot',
+   `R₃ → R₃ − R₂.<br><br>` + M([['1','2','−1','3'],['0','1','1','2'],['0','0','2','2']],3) +
+   `<br><br>That's row echelon form. Three pivots, three unknowns — exactly one solution.`],
+  ['Back-substitute',
+   `From R₃: <span class="mono">2z = 2 ⇒ z = 1</span><br>
+    From R₂: <span class="mono">y + z = 2 ⇒ y = 1</span><br>
+    From R₁: <span class="mono">x + 2y − z = 3 ⇒ x + 2 − 1 = 3 ⇒ x = 2</span>`],
+  ['Answer', `<span class="gd">(x, y, z) = (2, 1, 1)</span><br><br>
+    Check it in the original second equation:
+    ${C('2(2) + 5(1) − 1(1) = 4 + 5 − 1 = 8')} ✓ — always spend the 10 seconds
+    to check one row. It catches nearly every arithmetic slip.`,'final']
+ ]},
+
+{tier:'core',topic:'Matrix dimensions',type:'disc',
+ q:'A is 3×2. B is 2×4. Which products exist, and what size are they?',
+ opts:['AB','BA','AᵀB','ABᵀ'],
+ nudge:'Inner dimensions must match. Outer dimensions give the result.',
+ steps:[
+  ['The rule',
+   `For ${C('(m×n)(n×p)')} the two inner numbers must be equal, and the answer is
+    ${C('m×p')}. Write the shapes side by side and cross out the touching pair.`],
+  ['Check each',
+   `<span class="gd">AB</span> — (3×<span class="hl">2</span>)(<span class="hl">2</span>×4) ✓ → <b>3×4</b><br>
+    <span class="bd">BA</span> — (2×<span class="hl">4</span>)(<span class="hl">3</span>×2) ✗ &nbsp;4 ≠ 3<br>
+    <span class="bd">AᵀB</span> — Aᵀ is 2×3, so (2×<span class="hl">3</span>)(<span class="hl">2</span>×4) ✗ &nbsp;3 ≠ 2<br>
+    <span class="bd">ABᵀ</span> — Bᵀ is 4×2, so (3×<span class="hl">2</span>)(<span class="hl">4</span>×2) ✗ &nbsp;2 ≠ 4`],
+  ['Answer',`Only <span class="gd">AB</span> exists, and it is <b>3×4</b>.<br><br>
+    The trap here is ABᵀ — transposing looks helpful but it flips the dimension that
+    was already matching. Check shapes <i>after</i> the transpose, never before.`,'final']
+ ]},
+
+{tier:'core',topic:'Determinants',type:'work',
+ q:'Compute the determinant.',
+ body: M([['2','−1','3'],['0','4','1'],['5','2','0']]),
+ nudge:'Expand along whichever row or column has the most zeros.',
+ steps:[
+  ['Pick the cheapest expansion',
+   `Row 2 has a zero in the first slot, so expanding along it saves one 2×2.
+    Sign pattern for row 2 is <span class="mono">− + −</span>.`],
+  ['Expand',
+   `<span class="mono">det = −0·M₂₁ + 4·M₂₂ − 1·M₂₃</span><br><br>
+    ${C('M₂₂')} deletes row 2 and column 2: ${M([['2','3'],['5','0']])}
+    = (2)(0) − (3)(5) = <span class="hl">−15</span><br><br>
+    ${C('M₂₃')} deletes row 2 and column 3: ${M([['2','−1'],['5','2']])}
+    = (2)(2) − (−1)(5) = <span class="hl">9</span>`],
+  ['Combine',
+   `<span class="mono">det = 0 + 4(−15) − 1(9) = −60 − 9 = −69</span>`],
+  ['Answer',`<span class="gd">det = −69</span><br><br>
+    Non-zero ⇒ the matrix is invertible, its columns are linearly independent,
+    and ${C('Ax = b')} has exactly one solution for every b. One number, four facts.`,'final']
+ ]},
+
+{tier:'core',topic:'Invertibility',type:'disc',
+ q:'det(A) = 0. Which of these are true?',
+ opts:['A⁻¹ exists','The columns of A are linearly dependent',
+       'Ax = 0 has only the trivial solution','Ax = b has a solution for every b'],
+ nudge:'These are all the same statement wearing different clothes.',
+ steps:[
+  ['One condition, many faces',
+   `The Invertible Matrix Theorem says: for a square A, either <i>all</i> of these
+    hold or <i>none</i> do. ${C('det(A) = 0')} puts you firmly in the "none" column.`],
+  ['So',
+   `<span class="bd">A⁻¹ exists</span> — false<br>
+    <span class="gd">Columns linearly dependent</span> — <b>true</b><br>
+    <span class="bd">Ax = 0 only trivial</span> — false, there are infinitely many solutions<br>
+    <span class="bd">Ax = b solvable for every b</span> — false, only for b in the column space`],
+  ['Answer',`Only the second is true.<br><br>
+    Memorise the two-column version, not four separate facts: <span class="hl">det ≠ 0</span>
+    ⇒ invertible, independent columns, unique solution, full rank.
+    <span class="hl">det = 0</span> ⇒ the opposite of all four.`,'final']
+ ]},
+
+{tier:'core',topic:'Inverses',type:'work',
+ q:'Find A⁻¹.',
+ body: M([['4','7'],['2','6']]),
+ nudge:'2×2 has a formula. Use it, then verify.',
+ steps:[
+  ['Determinant first',
+   `<span class="mono">det = (4)(6) − (7)(2) = 24 − 14 = 10</span><br><br>
+    Non-zero, so the inverse exists. If this were 0 you would stop here.`],
+  ['Apply the 2×2 formula',
+   `For ${M([['a','b'],['c','d']])} the inverse is
+    ${F('1','det')} ${M([['d','−b'],['−c','a']])}<br><br>
+    Swap a and d. Negate b and c. <span class="hl">Do not</span> negate a and d —
+    that is the single most common slip on this problem.`],
+  ['Substitute',
+   `${F('1','10')} ${M([['6','−7'],['−2','4']])} =
+    ${M([['0.6','−0.7'],['−0.2','0.4']])}`],
+  ['Answer',
+   `<span class="gd">A⁻¹ = ${M([['0.6','−0.7'],['−0.2','0.4']])}</span><br><br>
+    Verify: ${C('A·A⁻¹')} row 1 = (4)(0.6)+(7)(−0.2) = 2.4−1.4 = 1 ✓ and
+    (4)(−0.7)+(7)(0.4) = −2.8+2.8 = 0 ✓`,'final']
+ ]},
+
+{tier:'core',topic:'Linear independence',type:'work',
+ q:'Are these three vectors linearly independent?',
+ body: `<span class="vgrp">v₁ =${V(['1','2','3'])}</span>
+        <span class="vgrp">v₂ =${V(['0','1','4'])}</span>
+        <span class="vgrp">v₃ =${V(['2','5','10'])}</span>`,
+ nudge:'Three vectors in ℝ³ — there is a one-step way to settle this.',
+ steps:[
+  ['Use the shortcut',
+   `n vectors in ℝⁿ: build the matrix with them as columns and take the determinant.
+    Non-zero ⇒ independent. This is far faster than row reducing.<br><br>
+    ${M([['1','0','2'],['2','1','5'],['3','4','10']])}`],
+  ['Expand along row 1',
+   `<span class="mono">det</span> = <span class="mono">1</span>·${M([['1','5'],['4','10']])}
+    <span class="mono">− 0 +</span> <span class="mono">2</span>·${M([['2','1'],['3','4']])}<br><br>
+    = 1(10 − 20) + 2(8 − 3) = −10 + 10 = <span class="hl">0</span>`],
+  ['What zero means here',
+   `<span class="gd">Linearly dependent.</span> There is a non-trivial combination
+    giving 0 — in fact ${C('v₃ = 2v₁ + v₂')}:
+    2(1,2,3) + (0,1,4) = (2,5,10) ✓`],
+  ['Answer',
+   `<span class="gd">Dependent.</span> They span only a plane in ℝ³, not all of it.`,'final'],
+  ['Picture it',`${svgSpan}<div style="color:var(--dim);font-size:14.5px">
+   Three dependent vectors in ℝ³ all lie in one plane. A third vector that is already
+   a combination of the first two adds no new direction — the span stays 2-dimensional.
+   </div>`,'why']
+ ]},
+
+{tier:'core',topic:'Solution types',type:'disc',
+ q:'A 2-equation, 2-unknown system. What do the three pictures mean?',
+ body:`<div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center">
+   <div>${svgLines('one')}<div style="text-align:center;color:var(--dim);font-size:14px">A</div></div>
+   <div>${svgLines('none')}<div style="text-align:center;color:var(--dim);font-size:14px">B</div></div>
+   <div>${svgLines('inf')}<div style="text-align:center;color:var(--dim);font-size:14px">C</div></div></div>`,
+ nudge:'Match each to its row-echelon signature.',
+ steps:[
+  ['Read them off',
+   `<b>A</b> — lines cross once ⇒ <span class="gd">exactly one solution</span>.
+    Echelon form has a pivot in every column: ${C('[1 0 | a; 0 1 | b]')}<br><br>
+    <b>B</b> — parallel, never meet ⇒ <span class="bd">no solution</span> (inconsistent).
+    Echelon form has a row like ${C('[0 0 | 5]')}, i.e. 0 = 5.<br><br>
+    <b>C</b> — same line ⇒ <span class="hl">infinitely many solutions</span>.
+    Echelon form has a zero row ${C('[0 0 | 0]')} and a free variable.`],
+  ['The thing to actually remember',
+   `A zero row on the <span class="hl">left</span> with a non-zero on the
+    <span class="hl">right</span> means no solutions. A fully zero row means
+    infinitely many. Mixing these two up is worth more lost points than any
+    arithmetic error on this quiz.`,'final']
+ ]},
+
+{tier:'core',topic:'Null space',type:'work',
+ q:'Find the null space of A.',
+ body: M([['1','3','−2'],['2','6','−4']]),
+ nudge:'Solve Ax = 0. Watch what happens to row 2.',
+ steps:[
+  ['Row reduce',
+   `R₂ → R₂ − 2R₁ gives ${M([['1','3','−2'],['0','0','0']])}<br><br>
+    One pivot, three columns ⇒ <span class="hl">two free variables</span>
+    (y and z). Rank 1, nullity 2.`],
+  ['Write the equation out',
+   `The surviving row says ${C('x + 3y − 2z = 0')}, so ${C('x = −3y + 2z')}.<br><br>
+    Let ${C('y = s')} and ${C('z = t')}, both free.`],
+  ['Split into basis vectors',
+   `${V(['−3s + 2t','s','t'])} = s${V(['−3','1','0'])} + t${V(['2','0','1'])}`],
+  ['Answer',
+   `<span class="gd">Null(A) = span{ (−3,1,0), (2,0,1) }</span> — a plane through the
+    origin in ℝ³.<br><br>
+    Sanity check with rank–nullity: ${C('rank + nullity = 1 + 2 = 3')} = number of
+    columns ✓`,'final']
+ ]},
+
+{tier:'core',topic:'Homework 1 Q4',type:'missed',
+ q:'You lost 3 of 5 points here. Matrix multiplication — compute AB.',
+ body: M([['1','2'],['3','4']]) + '<span style="font-size:22px">·</span>' + M([['0','1'],['5','−2']]),
+ nudge:'Row of the first times column of the second. Slowly.',
+ miss:{what:'You computed entrywise products — multiplied 1·0, 2·1, 3·5, 4·(−2) — giving [[0,2],[15,−8]].',
+       why:'That is the Hadamard product, not matrix multiplication. Matrix multiplication pairs a whole ROW with a whole COLUMN and sums.'},
+ steps:[
+  ['Entry (1,1): row 1 · column 1',
+   `Row 1 of A is <span class="mono">(1, 2)</span>. Column 1 of B is
+    <span class="mono">(0, 5)</span>.<br>
+    <span class="mono">(1)(0) + (2)(5) = 10</span>`],
+  ['Entry (1,2): row 1 · column 2',
+   `<span class="mono">(1)(1) + (2)(−2) = 1 − 4 = −3</span>`],
+  ['Row 2 the same way',
+   `(2,1): <span class="mono">(3)(0) + (4)(5) = 20</span><br>
+    (2,2): <span class="mono">(3)(1) + (4)(−2) = 3 − 8 = −5</span>`],
+  ['Answer',
+   `<span class="gd">AB = ${M([['10','−3'],['20','−5']])}</span><br><br>
+    The habit that fixes this permanently: say the entry's address out loud before
+    computing it. "Entry two-one — row two, column one." You cannot say that and
+    then multiply entrywise.`,'final']
+ ]},
+
+{tier:'core',topic:'Transpose rules',type:'disc',
+ q:'Which of these is correct?',
+ opts:['(AB)ᵀ = AᵀBᵀ','(AB)ᵀ = BᵀAᵀ','(A + B)ᵀ = Aᵀ + Bᵀ','(A⁻¹)ᵀ = (Aᵀ)⁻¹'],
+ nudge:'Two are right. One is the classic trap.',
+ steps:[
+  ['The order flips',
+   `<span class="bd">(AB)ᵀ = AᵀBᵀ</span> — <b>wrong</b>, and it is the trap.
+    Transposing a product <span class="hl">reverses the order</span>.<br><br>
+    <span class="gd">(AB)ᵀ = BᵀAᵀ</span> — correct.`],
+  ['Why it has to reverse',
+   `Dimensions force it. If A is 3×2 and B is 2×4, then AB is 3×4 and (AB)ᵀ is 4×3.
+    Now AᵀBᵀ would be (2×3)(4×2) — undefined. BᵀAᵀ is (4×2)(2×3) = 4×3 ✓<br><br>
+    You never have to memorise this one. Just check the shapes.`,'why'],
+  ['The others',
+   `<span class="gd">(A + B)ᵀ = Aᵀ + Bᵀ</span> — correct, addition is entrywise so
+    order is irrelevant.<br>
+    <span class="gd">(A⁻¹)ᵀ = (Aᵀ)⁻¹</span> — correct, transpose and inverse commute.`],
+  ['Answer',`Correct: <span class="gd">2, 3, and 4</span>. Only the first is wrong.`,'final']
+ ]},
+
+{tier:'core',topic:'Row operations',type:'disc',
+ q:'Which row operations change the determinant, and how?',
+ opts:['Swap two rows','Add a multiple of one row to another','Multiply a row by k'],
+ nudge:'Only one of these leaves it completely alone.',
+ steps:[
+  ['Each one',
+   `<b>Swap two rows</b> — determinant flips sign. ${C('det → −det')}<br><br>
+    <b>Add a multiple of a row to another</b> — <span class="gd">no change at all</span>.
+    This is why Gaussian elimination is safe for computing determinants.<br><br>
+    <b>Multiply a row by k</b> — determinant scales by k. ${C('det → k·det')}`],
+  ['Where this bites',
+   `If you row reduce to triangular form and multiply the diagonal, you must undo
+    every swap (sign flip) and every scaling (divide back out). Forgetting the swaps
+    gives you the right magnitude with the wrong sign — a very expensive
+    one-character error.`,'why'],
+  ['Answer',
+   `Swap flips the sign, scaling by k multiplies by k, and
+    <span class="gd">adding a multiple of a row changes nothing</span>.`,'final']
+ ]},
+
+{tier:'core',topic:'Rank',type:'work',
+ q:'Find the rank of A.',
+ body: M([['1','2','1'],['2','4','3'],['3','6','4']]),
+ nudge:'Reduce and count pivots. Look at the columns first though.',
+ steps:[
+  ['Notice before you compute',
+   `Column 2 is exactly <span class="hl">2 × column 1</span>. So the columns are
+    already dependent and the rank is at most 2. That is a free half-mark of
+    information before any arithmetic.`],
+  ['Reduce',
+   `R₂ → R₂ − 2R₁ and R₃ → R₃ − 3R₁:<br><br>
+    ${M([['1','2','1'],['0','0','1'],['0','0','1']])}<br><br>
+    Then R₃ → R₃ − R₂: ${M([['1','2','1'],['0','0','1'],['0','0','0']])}`],
+  ['Count pivots',
+   `Pivots in column 1 and column 3. Column 2 has none — it is a free column.
+    <span class="mono">rank = 2</span>`],
+  ['Answer',
+   `<span class="gd">rank(A) = 2</span>, nullity = 3 − 2 = 1.<br><br>
+    Rank is the number of pivots, which equals the dimension of the column space
+    <i>and</i> the row space. Those two are always equal, which surprises people
+    and shows up on exams for exactly that reason.`,'final']
+ ]},
+
+{tier:'core',topic:'Homework 1 Q2',type:'missed',
+ q:'You lost 2 of 5 points. Is (2, −1, 3) in the span of (1, 0, 1) and (0, 1, −1)?',
+ nudge:'Set up the vector equation, then solve. Do not eyeball it.',
+ miss:{what:'You answered "yes" by matching the first two components and stopping.',
+       why:'The first two components are determined by c₁ and c₂ immediately — the whole question is whether the THIRD component then happens to work out. That is the only line that carries information.'},
+ steps:[
+  ['Set up the equation',
+   `${C('c₁(1,0,1) + c₂(0,1,−1) = (2,−1,3)')}<br><br>
+    Component by component:<br>
+    <span class="mono">c₁ = 2</span><br>
+    <span class="mono">c₂ = −1</span><br>
+    <span class="mono">c₁ − c₂ = 3</span>`],
+  ['Test the last equation',
+   `The first two pin the coefficients with no choice left: ${C('c₁ = 2, c₂ = −1')}.<br><br>
+    Substituting into the third: ${C('2 − (−1) = 3')} ✓`],
+  ['Answer',
+   `<span class="gd">Yes</span> — it is in the span, with ${C('c₁ = 2, c₂ = −1')}.<br><br>
+    The answer happens to be yes, but the reasoning is the graded part. Had the third
+    line given 2 − (−1) = 4, the answer would be no and nothing about the first two
+    components would have changed.`,'final']
+ ]},
+
+{tier:'core',topic:'Elimination check',type:'recall',
+ q:'You reduce a 3×4 augmented matrix and get a row of all zeros. What can you conclude?',
+ nudge:'Careful — this depends on which zeros.',
+ steps:[
+  ['Two different cases',
+   `<b>Row is ${C('[0 0 0 | 0]')}</b> — an equation that was redundant. You have fewer
+    independent equations than unknowns, so there is at least one free variable ⇒
+    <span class="hl">infinitely many solutions</span> (if consistent).<br><br>
+    <b>Row is ${C('[0 0 0 | 7]')}</b> — this says 0 = 7. ⇒
+    <span class="bd">no solutions</span>, the system is inconsistent.`],
+  ['Answer',
+   `A zero row alone tells you the equation was <span class="gd">redundant</span>,
+    not that the system is broken. Check the augmented column before concluding
+    anything.`,'final']
+ ]},
+
+/* ---------- full-set only ---------- */
+
+{tier:'full',topic:'Eigenvalues',type:'work',
+ q:'Find the eigenvalues of A.',
+ body: M([['3','1'],['0','2']]),
+ nudge:'Triangular. There is a shortcut, but do it the long way once to see why.',
+ steps:[
+  ['Characteristic equation',
+   `${C('det(A − λI) = 0')}<br><br>
+    ${M([['3−λ','1'],['0','2−λ']])} ⇒ ${C('(3−λ)(2−λ) − (1)(0) = 0')}`],
+  ['Solve',
+   `${C('(3−λ)(2−λ) = 0 ⇒ λ = 3 or λ = 2')}`],
+  ['The shortcut',
+   `A is upper triangular, and the eigenvalues of any triangular matrix are just its
+    <span class="hl">diagonal entries</span>. The off-diagonal 1 never mattered.
+    Spot triangular first and save two minutes.`,'why'],
+  ['Answer',`<span class="gd">λ = 3, λ = 2</span><br><br>
+    Check: trace = 3 + 2 = 5 = sum of eigenvalues ✓, det = 6 = product ✓`,'final']
+ ]},
+
+{tier:'full',topic:'Eigenvectors',type:'recall',
+ q:'What actually makes a vector an eigenvector?',
+ body: svgEigen,
+ nudge:'Say it geometrically before you say it algebraically.',
+ steps:[
+  ['Geometrically',
+   `An eigenvector is a direction the matrix <span class="hl">does not rotate</span>.
+    A stretches or squashes it along its own line. Everything else gets knocked off
+    its original direction.`],
+  ['Algebraically',
+   `${C('Ax = λx')} for some scalar λ, with ${C('x ≠ 0')}.<br><br>
+    The ${C('x ≠ 0')} matters: the zero vector satisfies the equation for every λ,
+    which is why it is excluded by definition.`],
+  ['Answer',
+   `<span class="gd">Ax = λx, x ≠ 0.</span> In the picture, the green vector keeps its
+    direction and doubles (λ = 2). The red one changes direction entirely — not an
+    eigenvector.`,'final']
+ ]},
+
+{tier:'full',topic:'Determinant 3×3',type:'work',
+ q:'Compute the determinant by row reduction instead of cofactors.',
+ body: M([['2','4','2'],['1','3','2'],['3','7','5']]),
+ nudge:'Track every operation that changes the value.',
+ steps:[
+  ['Factor out of row 1',
+   `Row 1 is all even: factor out a 2. That <span class="hl">multiplies the
+    determinant by 2</span>, so we must remember to put it back.<br><br>
+    ${C('det = 2 ·')} ${M([['1','2','1'],['1','3','2'],['3','7','5']])}`],
+  ['Eliminate below the pivot',
+   `R₂ → R₂ − R₁, R₃ → R₃ − 3R₁. These do <span class="gd">not</span> change the value.<br><br>
+    ${M([['1','2','1'],['0','1','1'],['0','1','2']])}`],
+  ['Finish to triangular',
+   `R₃ → R₃ − R₂, again no change.<br><br>
+    ${M([['1','2','1'],['0','1','1'],['0','0','1']])}`],
+  ['Multiply the diagonal, restore the factor',
+   `Triangular determinant = ${C('1 × 1 × 1 = 1')}.<br>
+    Put back the 2 we factored out: ${C('det = 2 × 1 = 2')}`],
+  ['Answer',`<span class="gd">det = 2</span><br><br>
+    No row swaps happened here. If there had been one, the sign would flip —
+    that is the bookkeeping people drop.`,'final']
+ ]},
+
+{tier:'full',topic:'Column space',type:'disc',
+ q:'A is 4×3 with rank 2. Which are true?',
+ opts:['Col(A) is a subspace of ℝ⁴','Col(A) is a subspace of ℝ³',
+       'dim Col(A) = 2','Null(A) has dimension 1'],
+ nudge:'Column space lives where the columns live.',
+ steps:[
+  ['Where does each space live?',
+   `A is 4×3, so each <span class="hl">column</span> has 4 entries ⇒
+    ${C('Col(A) ⊆ ℝ⁴')}.<br>
+    Each <span class="hl">row</span> has 3 entries, and ${C('x')} in ${C('Ax')} has
+    3 entries ⇒ ${C('Null(A) ⊆ ℝ³')}.`],
+  ['Dimensions',
+   `${C('dim Col(A) = rank = 2')} ✓<br>
+    Rank–nullity: ${C('rank + nullity = number of columns = 3')} ⇒ nullity =
+    3 − 2 = <span class="gd">1</span> ✓`],
+  ['Answer',
+   `<span class="gd">1, 3, and 4</span> are true. Statement 2 is the trap —
+    it swaps which dimension the column space inherits.<br><br>
+    Rank–nullity counts <span class="hl">columns</span>, never rows. Writing
+    "= number of columns" every single time you use it removes this whole error class.`,'final']
+ ]},
+
+{tier:'full',topic:'Systems with parameters',type:'work',
+ q:'For which k does this system have no solution?',
+ body: M([['1','2','3'],['2','k','6']],2),
+ nudge:'Reduce and look at what has to be true for the last row to be contradictory.',
+ steps:[
+  ['Eliminate',
+   `R₂ → R₂ − 2R₁:<br><br>
+    ${M([['1','2','3'],['0','k−4','0']],2)}`],
+  ['Read the bottom row',
+   `It says ${C('(k − 4)y = 0')}.<br><br>
+    If ${C('k ≠ 4')}: ${C('y = 0')}, then ${C('x = 3')}. Exactly one solution.<br>
+    If ${C('k = 4')}: the row is ${C('0 = 0')}. Redundant, so y is free —
+    infinitely many solutions.`],
+  ['Answer',
+   `<span class="gd">There is no value of k that gives no solution.</span><br><br>
+    The right-hand entry became 0 during elimination, so a contradictory row
+    ${C('[0 0 | nonzero]')} can never appear. A question asking "for which k is there
+    no solution" with the answer "never" is a standard trap — do not force a value
+    just because you were asked for one.`,'final']
+ ]},
+
+{tier:'full',topic:'Symmetric matrices',type:'recall',
+ q:'Prove that AᵀA is always symmetric, for any matrix A.',
+ nudge:'Two lines. Use the reversal rule.',
+ steps:[
+  ['What symmetric means',
+   `M is symmetric exactly when ${C('Mᵀ = M')}. So set ${C('M = AᵀA')} and compute
+    ${C('Mᵀ')}.`],
+  ['Compute',
+   `${C('(AᵀA)ᵀ = Aᵀ(Aᵀ)ᵀ')} &nbsp; — reversal rule, order flips<br>
+    ${C('= AᵀA')} &nbsp; — because ${C('(Aᵀ)ᵀ = A')}`],
+  ['Answer',
+   `${C('(AᵀA)ᵀ = AᵀA')}, so it is symmetric. ∎<br><br>
+    This works for <span class="hl">any</span> A, including non-square. If A is m×n
+    then AᵀA is n×n — always square, always symmetric. AAᵀ is m×m and also symmetric,
+    by the same two lines.`,'final']
+ ]},
+
+{tier:'full',topic:'Inverse of 3×3',type:'disc',
+ q:'Fastest way to decide whether a 3×3 matrix is invertible?',
+ opts:['Row reduce to RREF and check for I','Compute the determinant',
+       'Compute the full inverse and see if it works'],
+ nudge:'The question is invertible-or-not, not what the inverse is.',
+ steps:[
+  ['Compare the work',
+   `<b>Determinant</b> — one cofactor expansion, roughly 9 multiplications.
+    Non-zero ⇒ invertible. <span class="gd">Fastest by a distance.</span><br><br>
+    <b>RREF</b> — correct, and it also tells you the rank, but it is several rows of
+    arithmetic.<br><br>
+    <b>Compute the full inverse</b> — enormously more work, and if the matrix is
+    singular you find out only after wasting all of it.`],
+  ['Answer',
+   `<span class="gd">Compute the determinant.</span><br><br>
+    Choose the tool that answers the question asked. "Is it invertible" is a yes/no,
+    and det is the yes/no machine. Only compute the inverse when you actually need
+    the entries.`,'final']
+ ]},
+];
+
+/* ---------- engine ---------- */
+let mode='core', queue=[], idx=0, revealed=0, missed=[], done=0, total=0, ended=false;
+
+const pool = () => CARDS.filter(c => mode==='full' || c.tier==='core');
+
+function start(){
+  queue = pool().map((c,i)=>({...c, n:i}));
+  idx=0; revealed=0; missed=[]; done=0; total=queue.length; ended=false;
+  render();
+}
+
+function render(){
+  const el = document.getElementById('card');
+  if(ended){ return renderEnd(); }
+  const c = queue[idx];
+  const kinds={work:'Worked problem',disc:'Which is right?',recall:'Recall',missed:'You missed this'};
+  let h = `<span class="tag t-${c.type}">${kinds[c.type]} · ${c.topic}</span>`;
+  h += `<h2 class="q">${c.q}</h2>`;
+  if(c.body) h += `<div style="margin:18px 0 4px">${c.body}</div>`;
+  if(c.opts) h += `<ul class="opts">${c.opts.map((o,i)=>
+      `<li><b style="color:var(--dim);font-family:ui-monospace,Menlo,monospace">${i+1}.</b> &nbsp;${o}</li>`).join('')}</ul>`;
+  if(c.miss && revealed>0)
+    h += `<div class="miss"><h4>What went wrong last time</h4><div class="b">${c.miss.what}</div>
+          <div class="b" style="color:var(--dim)">${c.miss.why}</div></div>`;
+  if(revealed===0){
+    h += `<p class="nudge">${c.nudge||'Work it out before revealing.'} &nbsp;
+          <span style="color:var(--cyan)">Space</span> reveals one step at a time.</p>`;
+  }
+  c.steps.slice(0,revealed).forEach((s,i)=>{
+    const cls = s[2] ? ' '+s[2] : '';
+    h += `<div class="step${cls}"><h4>${s[2]==='why'?'Why':'Step '+(i+1)} — ${s[0]}</h4><div class="b">${s[1]}</div></div>`;
+  });
+  el.innerHTML = h;
+  window.scrollTo({top:0,behavior:'smooth'});
+  document.getElementById('count').textContent = `${done+1} / ${total}`;
+  document.getElementById('prog').style.width = (done/total*100)+'%';
+  foot();
+}
+
+function foot(){
+  const c = queue[idx], f = document.getElementById('foot');
+  if(ended){ f.innerHTML = `<button class="key primary" onclick="start()">restart</button>
+      <button class="key" onclick="dump()"><kbd>B</kbd>brain dump</button>`; return; }
+  if(revealed < c.steps.length){
+    f.innerHTML = `<button class="key primary" onclick="next()"><kbd>space</kbd>
+      ${revealed===0?'show first step':'next step'}</button>
+      <button class="key" onclick="all()">show all</button>
+      <button class="key" onclick="dump()"><kbd>B</kbd>brain dump</button>`;
+  } else {
+    f.innerHTML = `<button class="key ok" onclick="grade(1)"><kbd>space</kbd>got it</button>
+      <button class="key no" onclick="grade(0)"><kbd>M</kbd>missed it</button>
+      <button class="key" onclick="dump()"><kbd>B</kbd>brain dump</button>`;
+  }
+}
+
+function next(){ const c=queue[idx]; if(revealed<c.steps.length){revealed++;render();} }
+function all(){ revealed = queue[idx].steps.length; render(); }
+
+function grade(got){
+  const c = queue[idx];
+  if(!got){
+    missed.push(c.topic);
+    queue.push({...c, requeued:true});     // comes back at the end
+    total = queue.length;
+  }
+  done++;
+  idx++;
+  revealed=0;
+  if(idx>=queue.length){ ended=true; }
+  render();
+}
+
+function renderEnd(){
+  const uniq=[...new Set(missed)];
+  const tally={}; missed.forEach(t=>tally[t]=(tally[t]||0)+1);
+  const ranked=Object.entries(tally).sort((a,b)=>b[1]-a[1]);
+  const el=document.getElementById('card');
+  let h=`<div class="end"><h2>${uniq.length?'Done — here is the leak.':'Clean run.'}</h2>
+    <p class="sub">${pool().length} cards, ${missed.length} missed.</p>`;
+  if(ranked.length){
+    h+=`<div class="leak"><b>Where you are actually losing points</b><ol>` +
+       ranked.map(([t,n])=>`<li><b>${t}</b> — missed ${n}×</li>`).join('') +
+       `</ol><p style="color:var(--dim);margin:16px 0 0">
+        Next 20 minutes: redo <b>${ranked[0][0]}</b> only. One topic, worked slowly,
+        beats another full pass over everything you already know.</p></div>`;
+  } else {
+    h+=`<div class="leak">Nothing missed. Switch to the
+        <b>full</b> set for the harder material, or spend the next 20 minutes on a
+        different course — MATH 231 is not where your points are going.</div>`;
+  }
+  h+=`<p style="color:var(--dim)">Press <span class="mono">B</span> for the brain
+      dump — the sheet you want to reproduce from memory the moment the quiz starts.</p></div>`;
+  el.innerHTML=h; foot();
+  document.getElementById('prog').style.width='100%';
+}
+
+/* ---------- brain dump ---------- */
+const DUMP = [
+ ['Determinant 2×2', `${M([['a','b'],['c','d']])} → ${C('ad − bc')}`],
+ ['Inverse 2×2', `${F('1','ad−bc')} ${M([['d','−b'],['−c','a']])} &nbsp; — swap the diagonal, negate the other two`],
+ ['Invertible ⇔', `det ≠ 0 ⇔ independent columns ⇔ full rank ⇔ Ax = 0 only trivial ⇔ unique solution for every b`],
+ ['Rank–nullity', `${C('rank + nullity = number of COLUMNS')}`],
+ ['Row ops on det', `swap → ${C('−det')} &nbsp;·&nbsp; scale row by k → ${C('k·det')} &nbsp;·&nbsp; add multiple of a row → <b>unchanged</b>`],
+ ['Transpose', `${C('(AB)ᵀ = BᵀAᵀ')} — order reverses. ${C('(A+B)ᵀ = Aᵀ+Bᵀ')}. ${C('(A⁻¹)ᵀ = (Aᵀ)⁻¹')}`],
+ ['Product shapes', `${C('(m×n)(n×p) = m×p')} — inner must match`],
+ ['Zero row means', `${C('[0 … 0 | 0]')} → redundant, free variable, ∞ solutions &nbsp;·&nbsp; ${C('[0 … 0 | c]')}, c≠0 → <b>no solution</b>`],
+ ['Eigen', `${C('Ax = λx, x ≠ 0')} · solve ${C('det(A − λI) = 0')} · triangular ⇒ eigenvalues are the diagonal`],
+ ['Eigen checks', `sum of λ = trace &nbsp;·&nbsp; product of λ = det`],
+ ['Col vs Null space', `A is m×n → ${C('Col(A) ⊆ ℝᵐ')}, ${C('Null(A) ⊆ ℝⁿ')}`],
+ ['AᵀA', `always square and always symmetric, for any A`],
+];
+
+let dumping=false;
+function dump(){
+  dumping=!dumping;
+  const el=document.getElementById('card');
+  if(!dumping){ render(); return; }
+  el.innerHTML = `<div class="dump"><h3>Brain dump</h3>
+    <p class="sub" style="margin:0 0 14px">Reproduce this on scratch paper the second
+    the quiz starts, before you read a single question.</p>` +
+    DUMP.map(([k,v])=>`<div class="row"><b>${k}</b><span>${v}</span></div>`).join('') +
+    `</div>`;
+  document.getElementById('foot').innerHTML =
+    `<button class="key primary" onclick="dump()"><kbd>B</kbd>back to cards</button>`;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ---------- input ---------- */
+document.addEventListener('keydown', e=>{
+  if(e.key==='b'||e.key==='B'){ e.preventDefault(); return dump(); }
+  if(dumping) return;
+  if(e.key===' '||e.key==='Enter'){
+    e.preventDefault();
+    if(ended) return;
+    const c=queue[idx];
+    if(revealed<c.steps.length) next(); else grade(1);
+  }
+  if(e.key==='m'||e.key==='M'){ if(!ended && revealed>=queue[idx].steps.length) grade(0); }
+  if(e.key==='ArrowRight'){ if(!ended) next(); }
+});
+
+document.getElementById('m20').onclick=()=>{
+  mode='core'; m20.classList.add('on'); mfull.classList.remove('on'); start();};
+document.getElementById('mfull').onclick=()=>{
+  mode='full'; mfull.classList.add('on'); m20.classList.remove('on'); start();};
+document.getElementById('bdump').onclick=dump;
+
+start();
+</script>
+</body>
+</html>

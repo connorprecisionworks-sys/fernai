@@ -275,6 +275,12 @@ which is where you're actually losing points. The other three topics need
 another hour." The floor has to be real and under 30 minutes, and it has to
 say honestly what it doesn't cover.
 
+There's a working example in
+[`examples/packet-math231-example.html`](examples/packet-math231-example.html) —
+open it in a browser. Linear algebra, so it shows the math handling: matrices
+drawn with CSS brackets, SVG diagrams for span and eigenvectors, and solutions
+you step through one move at a time instead of one big reveal.
+
 `/packet` is where this pays off. It builds a single self-contained HTML file:
 one question on screen at a time, answers hidden until you commit, missed
 cards come back, visible progress, and a brain-dump sheet at the end. Weighted

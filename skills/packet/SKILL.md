@@ -124,6 +124,50 @@ Required behavior:
 Style it dark, high contrast, big type (18px+ body, 24px+ questions). It gets
 read on a laptop at 11pm.
 
+### Math, and anything else that needs real notation
+
+Do not render formulas as plain text — `[[1,2],[3,4]]` is unreadable and the
+student won't trust it. No MathJax or KaTeX either; the file must work offline.
+Build the notation yourself:
+
+- **Matrices and vectors** — an HTML `<table>` wrapped in a span with square
+  brackets drawn as CSS pseudo-elements:
+  ```css
+  .m{display:inline-block;position:relative;padding:.34em .62em}
+  .m::before,.m::after{content:"";position:absolute;top:0;bottom:0;
+    width:.34em;border:2px solid currentColor}
+  .m::before{left:0;border-right:0}   /* [ */
+  .m::after {right:0;border-left:0}   /* ] */
+  ```
+  For augmented matrices, add a dashed `border-left` to the last column's cells.
+  Label vectors (`v₁ = [...]`) rather than running three brackets together.
+- **Fractions** — a flex column with a `border-bottom` on the numerator.
+- **Symbols** — Unicode covers almost everything: λ ⁻¹ ᵀ ℝ ⇒ ≠ ≤ ∈ ∅ × · ᵢ ₙ.
+- **Diagrams** — inline SVG, hand-written. Span as a shaded plane, eigenvectors
+  as arrows that keep vs. change direction, three line-pair sketches for
+  one/none/infinite solutions. A 200-byte SVG explains "dependent" better than
+  a paragraph does.
+
+**Bug that will bite you:** a `<table>` inside a `<p>` is invalid HTML. The
+browser silently closes the paragraph early and the bracket spans collapse into
+garbage. Use `<div>` for any block that might contain a matrix. Render the page
+and look at it before handing it over.
+
+### Stepped solutions for anything procedural
+
+For math, physics, or any worked problem, one reveal is not enough — the whole
+value is seeing where the reasoning turns. Break the solution into 3–5 steps
+revealed one at a time, so the student can try, peek at step 1, try again.
+
+Each step gets a short title naming the *move*, not the arithmetic: "Kill the
+entries below the first pivot" beats "Step 1". End with the answer, then a
+verification line ("check it in the original second equation") — the checking
+habit is worth as much as the method.
+
+Add a separate amber **"why"** step wherever there's a trap: why the order
+reverses in `(AB)ᵀ`, why the obvious wrong approach fails, why the shortcut is
+legal. That's the step people remember.
+
 **Do not use localStorage or sessionStorage** — keep state in memory. Say
 plainly that closing the tab loses progress.
 
