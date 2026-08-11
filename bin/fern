@@ -49,7 +49,7 @@ SNAPSHOT = os.path.join(DIR, "snapshot.json")
 WELCOMED = os.path.join(DIR, ".welcomed")
 MEMORY = os.path.join(DIR, "memory.md")
 STATE = os.path.join(DIR, "state.json")
-VERSION = "2.9.1"
+VERSION = "2.9.2"
 
 
 # ───────────────────────────── style ─────────────────────────────
@@ -1247,17 +1247,24 @@ class TaskPanel:
         self.t = None
         self.lock = threading.Lock()
 
+    def relabel(self, tid, label):
+        if not label:
+            return
+        with self.lock:
+            if tid in self.tasks:
+                self.tasks[tid]["label"] = label
+
     def add(self, tid, label):
         with self.lock:
             if tid in self.tasks:
                 return
-            self.tasks[tid] = {"label": label or "working",
+            self.tasks[tid] = {"label": label or "starting…",
                                "t0": time.time(), "done": False}
             self.order.append(tid)
         if S.on:
             self._start()
-        else:
-            print(f"    · started  {self.tasks[tid]['label']}", flush=True)
+        # plain logs get a line when each one lands, not when it starts —
+        # at start we usually don't know its name yet.
 
     def finish(self, tid, failed=False):
         with self.lock:
@@ -1403,6 +1410,7 @@ def ask_claude(prompt, session_id=None, stream=True):
         die("The `claude` CLI isn't installed.",
             "Install Claude Code, then run fern again: https://claude.com/claude-code")
 
+    _t_start = time.time()
     text, sid, started, api_error = "", session_id, False, None
     md = MDStream()
     panel = TaskPanel()
@@ -1418,6 +1426,12 @@ def ask_claude(prompt, session_id=None, stream=True):
                 ev = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            if os.environ.get("FERN_DEBUG"):
+                _k = ev.get("type")
+                if _k == "stream_event":
+                    _k += "/" + str((ev.get("event") or {}).get("type"))
+                sys.stderr.write(f"[{time.time() - _t_start:6.2f}s] {_k}\n")
+                sys.stderr.flush()
             if ev.get("session_id"):
                 sid = ev["session_id"]
             t = ev.get("type")
@@ -1433,7 +1447,8 @@ def ask_claude(prompt, session_id=None, stream=True):
                                  or (inp.get("prompt") or "").strip().split("\n")[0])
                         if sp:
                             sp.clear()      # the panel is the progress now
-                        panel.add(blk.get("id"), label)
+                        panel.add(blk.get("id"), label)   # no-op if already open
+                        panel.relabel(blk.get("id"), label)
             elif t == "user":
                 for blk in (ev.get("message") or {}).get("content") or []:
                     if blk.get("type") == "tool_result":
@@ -1441,7 +1456,15 @@ def ask_claude(prompt, session_id=None, stream=True):
                                      failed=bool(blk.get("is_error")))
 
             if t == "stream_event":
-                d = (ev.get("event") or {}).get("delta") or {}
+                _e = ev.get("event") or {}
+                if _e.get("type") == "content_block_start":
+                    _cb = _e.get("content_block") or {}
+                    if (_cb.get("type") == "tool_use"
+                            and _cb.get("name") in ("Agent", "Task")):
+                        if sp:
+                            sp.clear()
+                        panel.add(_cb.get("id"), None)
+                d = _e.get("delta") or {}
                 if d.get("type") == "text_delta":
                     chunk = d.get("text", "")
                     if chunk:
