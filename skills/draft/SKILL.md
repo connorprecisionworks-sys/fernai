@@ -52,7 +52,12 @@ structure they'd have rejected in ten seconds.
 
 ## Step 4 — Draft
 
-Then write it. Rules:
+**Write it to a file**, not into the chat — `~/Desktop/fern-drafts/<COURSE> -
+<assignment>.md`, or alongside the assignment if they told you where. Then say
+where it is and what still needs their call, in about three lines. A draft
+pasted into a terminal cannot be edited or submitted; a file can.
+
+Rules for the writing itself:
 
 - Plain, direct sentences. No "in today's society," no "since the dawn of
   time," no throat-clearing.

@@ -46,7 +46,7 @@ if os.path.isdir(_OLD) and not os.path.exists(DIR):
 CREDS = os.path.join(DIR, "credentials.json")
 SNAPSHOT = os.path.join(DIR, "snapshot.json")
 WELCOMED = os.path.join(DIR, ".welcomed")
-VERSION = "2.4.0"
+VERSION = "2.5.0"
 
 
 # ───────────────────────────── style ─────────────────────────────
@@ -352,6 +352,23 @@ def get_all(base, token, path, params=None, cap=50):
 
 # ───────────────────────────── shaping ─────────────────────────────
 
+def detag(html, limit=6000):
+    """Canvas assignment descriptions are HTML. Flatten to readable text."""
+    if not html:
+        return None
+    s = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html)
+    s = re.sub(r"(?i)<br\s*/?>", "\n", s)
+    s = re.sub(r"(?i)</(p|div|li|tr|h[1-6])>", "\n", s)
+    s = re.sub(r"(?i)<li[^>]*>", "- ", s)
+    s = re.sub(r"<[^>]+>", "", s)
+    for a, b in [("&nbsp;", " "), ("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"),
+                 ("&quot;", '"'), ("&#39;", "'"), ("&rsquo;", "'"), ("&mdash;", "—")]:
+        s = s.replace(a, b)
+    s = re.sub(r"[ \t]+", " ", s)
+    s = re.sub(r"\n\s*\n\s*\n+", "\n\n", s).strip()
+    return (s[:limit] + " …[truncated]") if len(s) > limit else (s or None)
+
+
 def status_of(sub):
     if not sub:
         return "unknown"
@@ -501,7 +518,9 @@ def do_sync(base, token, only):
                       "points": a.get("points_possible"),
                       "status": status_of(a.get("submission") or {}),
                       "score": (a.get("submission") or {}).get("score"),
-                      "url": a.get("html_url")} for a in raw]
+                      "url": a.get("html_url"),
+                      "type": (a.get("submission_types") or [None])[0],
+                      "prompt": detag(a.get("description"))} for a in raw]
             g = grade_of(c)
             sp.done(f"{S.bold(name):<22} {len(items):>2} assignments"
                     f"{'   ' + S.gray(g) if g else ''}")
@@ -690,6 +709,7 @@ DEMO_SEMESTER = {'pulled_at': None,
                                'score': 10,
                                'url': None},
                               {'title': 'Lab 1: Microscopy writeup',
+   'prompt': 'Formal lab report on the microscopy exercise (Weeks 1-2).\nSections required, in order: Title, Introduction (state the purpose and one hypothesis), Materials & Methods (past tense, passive voice), Results (include your labelled sketches at 40x, 100x and 400x with magnification stated for each), Discussion (compare observed cell structures to the textbook figures; address at least two sources of error), References (CSE style, minimum 2).\n- 4-6 pages, double spaced, 12pt\n- Your own data only. Sketches must be your originals from lab.\n- Submit as PDF. Late work accepted up to 7 days at -10%/day.',
                                '_due_offset_days': -3,
                                '_due_time': [23, 59],
                                'points': 50,
@@ -697,6 +717,7 @@ DEMO_SEMESTER = {'pulled_at': None,
                                'score': None,
                                'url': None},
                               {'title': 'Lab 2: Cell division writeup',
+   'prompt': 'Same report format as Lab 1, using your onion root tip mitosis counts. Include the mitotic index calculation and a table of phase counts.',
                                '_due_offset_days': 4,
                                '_due_time': [23, 59],
                                'points': 50,
@@ -704,6 +725,7 @@ DEMO_SEMESTER = {'pulled_at': None,
                                'score': None,
                                'url': None},
                               {'title': 'Discussion board wk3',
+   'prompt': 'Post a 150-word response to the prompt, then reply substantively to two classmates by Sunday. Cite the reading at least once.',
                                '_due_offset_days': 6,
                                '_due_time': [23, 59],
                                'points': 10,
@@ -743,6 +765,7 @@ DEMO_SEMESTER = {'pulled_at': None,
                                'score': None,
                                'url': None},
                               {'title': 'Problem set 3',
+   'prompt': 'Chapter 7 problems 1-14. Show mechanisms with curved arrows. Answers without mechanisms receive no credit.',
                                '_due_offset_days': 1,
                                '_due_time': [23, 59],
                                'points': 40,
@@ -768,6 +791,7 @@ DEMO_SEMESTER = {'pulled_at': None,
                                'score': 14,
                                'url': None},
                               {'title': 'Reading response 3',
+   'prompt': '500 words on the assigned chapter (Foner ch. 9). Pick ONE primary source from the chapter and argue what it reveals that the chapter narrative does not. Do not summarise the chapter.',
                                '_due_offset_days': 2,
                                '_due_time': [23, 59],
                                'points': 15,
@@ -775,6 +799,7 @@ DEMO_SEMESTER = {'pulled_at': None,
                                'score': None,
                                'url': None},
                               {'title': 'Primary source analysis',
+   'prompt': '1500 words analysing a single primary source from the course reader. Address: who produced it and why, intended audience, what it claims, what it omits, and how it complicates one argument from lecture. Chicago footnotes.',
                                '_due_offset_days': 7,
                                '_due_time': [23, 59],
                                'points': 100,
@@ -800,6 +825,7 @@ DEMO_SEMESTER = {'pulled_at': None,
                                'score': 20,
                                'url': None},
                               {'title': 'Homework 2',
+   'prompt': 'Section 2.3 problems 1-20 odd. Show row operations.',
                                '_due_offset_days': 2,
                                '_due_time': [23, 59],
                                'points': 25,
@@ -832,6 +858,7 @@ DEMO_SEMESTER = {'pulled_at': None,
                                'score': None,
                                'url': None},
                               {'title': 'Memo assignment',
+   'prompt': 'Write a 1-2 page internal memo recommending one of the three vendor options in the case packet (posted under Files > Week 3).\n- Standard memo header: TO / FROM / DATE / SUBJECT\n- Lead with the recommendation in the first sentence. No suspense.\n- Support with exactly three criteria; use a table only if it earns its space\n- Close with the specific next action you want your reader to take\n- Audience is a busy non-technical manager. Plain language.\nGraded on: recommendation clarity (20), evidence (20), organisation (10), audience fit (10).',
                                '_due_offset_days': 3,
                                '_due_time': [23, 59],
                                'points': 60,
@@ -839,6 +866,7 @@ DEMO_SEMESTER = {'pulled_at': None,
                                'score': None,
                                'url': None},
                               {'title': 'Peer review of memo',
+   'prompt': 'Review two classmates\' memos using the posted rubric. For each: one thing that works, two specific changes, and whether the recommendation is clear in the first sentence.',
                                '_due_offset_days': 6,
                                '_due_time': [23, 59],
                                'points': 20,
@@ -899,12 +927,38 @@ The floor must be real, not a lie to be encouraging. If 20 minutes only covers
 one topic out of four, say that: "20 minutes gets you titrations, which is
 where you lost the most points. The other three need another hour."
 
+## When they ask you to do something, do it
+
+"Draft my assignments", "make me a study guide", "write that email" are
+instructions, not requests for a plan. Never answer with what you *could* do,
+never ask whether to proceed, and never tell them to run a slash command — you
+can invoke the skill yourself. Say what you're starting, in one line, then
+start.
+
+Asking for something you could have found is the main way this gets annoying.
+The coursework below includes each assignment's **INSTRUCTIONS** straight from
+Canvas — read them before asking what an assignment wants. If instructions are
+missing, open the Canvas page. Only their own data, a personal position, a
+local file, or a format choice is worth a question.
+
+When you do need something, ask for **one thing at a time** — never a list of
+questions. And when the answer is one of a few options, number them so they can
+press a key instead of writing a sentence:
+
+      1  Flash cards
+      2  Practice quiz
+      3  Study packet
+
+For several deliverables at once, use the `batch` skill: it fans out one
+subagent per assignment and queues the questions.
+
 ## Always end with a thing you can do for them
 
 Your answers end with an offer or a physical action, never with an
 instruction to go feel motivated. Things you can actually make:
 
-- a **study packet** — say `/packet` and describe what would go in it
+- a **study packet** — build it, don't describe it
+- **everything at once** — `batch`, when they want the whole week handled
 - a plan with named blocks — `/plan-week`
 - a ranked order to work through — `/triage`
 - a tutoring session on one concept — `/tutor`
@@ -986,9 +1040,45 @@ def coursework_context():
             sc = f", scored {a['score']}" if a.get("score") is not None else ""
             rows.append(f"  - {a['title']} | due {when} | {a['points'] or '?'} pts "
                         f"| {a['status']}{sc}")
+            pr = a.get("prompt")
+            if pr:
+                body = pr if len(pr) <= 1200 else pr[:1200] + " …[see Canvas for the rest]"
+                rows.append("    INSTRUCTIONS: " + body.replace("\n", "\n      "))
         out += rows or ["  (no assignments)"]
         out.append("")
     return "\n".join(out)
+
+
+# Which skill a phrasing means. Checked in order; first match wins. Kept
+# deliberately narrow — a wrong route is worse than no route.
+ROUTES = [
+    ("batch", r"\b(draft|write|do|make|start|knock out|handle|finish|catch me up on)\b"
+              r"[^.?!]{0,40}\b(everything|all (of )?(my|the)?\s*(assignments|work|"
+              r"homework|stuff)?|my week|the week|whats? coming up|things coming up|"
+              r"my assignments|all six|all of it)\b"),
+    ("batch", r"\b(catch me up|do it all|handle it all|all my (work|assignments))\b"),
+    ("packet", r"\b(study (guide|packet|material|sheet)|flash ?cards|practice (quiz|exam|test)"
+               r"|quiz me|help me study|make me something to study)\b"),
+    ("draft",  r"\b(draft|write|start)\b[^.?!]{0,30}\b(essay|paper|memo|lab report|"
+               r"lab writeup|discussion post|response|reflection|proposal|assignment)\b"),
+    ("email",  r"\b(email|write|message)\b[^.?!]{0,30}\b(prof|professor|ta\b|instructor|"
+               r"advisor|dean)\b|\bask for an extension\b"),
+    ("triage", r"\b(what should i (do|work on|start)|where do i (start|begin)|"
+               r"prioriti[sz]e|rank (everything|my|all))\b"),
+    ("plan-week", r"\b(plan my week|weekly (plan|schedule)|schedule my week|"
+                  r"build me a schedule)\b"),
+]
+
+
+def route(prompt):
+    """Map plain phrasing onto a skill so nobody has to know the slash commands."""
+    if os.environ.get("FERN_NO_ROUTE") or prompt.lstrip().startswith("/"):
+        return None
+    low = prompt.lower()
+    for skill, pat in ROUTES:
+        if re.search(pat, low):
+            return skill
+    return None
 
 
 def have_claude():
@@ -1104,7 +1194,9 @@ class MDStream:
 
 def ask_claude(prompt, session_id=None, stream=True):
     """Send one turn to the claude CLI. Returns (text, session_id)."""
-    cmd = ["claude", "-p", prompt,
+    skill = route(prompt) if session_id is None else route(prompt)
+    sent = f"/{skill} {prompt}" if skill else prompt
+    cmd = ["claude", "-p", sent,
            "--append-system-prompt",
            PERSONA + "\n\n<coursework>\n" + coursework_context() + "\n</coursework>"]
     if session_id:

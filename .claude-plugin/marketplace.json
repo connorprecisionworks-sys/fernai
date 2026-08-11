@@ -11,7 +11,7 @@
       "displayName": "Fern AI",
       "description": "Eleven Claude skills plus the fern chat CLI for students: pulls real assignments and grades from Canvas, then handles triage, weekly planning, tutoring, cramming, study packets, drafting, and emails.",
       "source": "./",
-      "version": "2.4.0",
+      "version": "2.5.0",
       "license": "MIT",
       "category": "productivity",
       "keywords": ["students", "school", "study", "tutoring", "education"]
