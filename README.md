@@ -26,7 +26,7 @@ good at that thing would actually follow.
 ## Install
 
 ```bash
-git clone https://github.com/connorprecisionworks-sys/fernai.git
+git clone https://github.com/connorprecsionworks-sys/fern-ai.git
 cd fern-ai
 ./install.sh
 ```
@@ -63,7 +63,29 @@ problem set due tomorrow and a midterm in eleven days. Clear it any time with
 
 ### The CLI
 
-Just run `fern`. It opens a chat:
+First time you run `fern` it walks you through setup — pick one of three, and
+you're in:
+
+```
+   .-.    ███████╗███████╗██████╗ ███╗   ██╗
+  ( ./    ██╔════╝██╔════╝██╔══██╗████╗  ██║
+ \\\|//   █████╗  █████╗  ██████╔╝██╔██╗ ██║
+\\\\|///  ██╔══╝  ██╔══╝  ██╔══██╗██║╚██╗██║
+  \\|//   ██║     ███████╗██║  ██║██║ ╚████║
+    |     ╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝
+          A I   ·   your coursework, on tap
+
+  How do you want to start?
+
+    1  Try it with a fake semester   no setup, works right now
+    2  Connect my real Canvas        needs an access token, ~2 min
+    3  Just chat                     nothing loaded, ask it anything
+```
+
+Pick 1 and it loads a demo semester and drops you straight into the chat.
+Runs once — `fern welcome` replays it.
+
+After that, `fern` goes straight to the chat:
 
 ```
 ❯ fern
@@ -122,7 +144,7 @@ when piped or when `NO_COLOR` is set — so `fern due | grep CHEM` works fine.
 ### Option B — install as a plugin
 
 ```
-/plugin marketplace add connorprecisionworks-sys/fernai
+/plugin marketplace add connorprecsionworks-sys/fern-ai
 /plugin install fern-ai@fern-ai
 ```
 

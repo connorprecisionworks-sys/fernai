@@ -44,7 +44,8 @@ if os.path.isdir(_OLD) and not os.path.exists(DIR):
         pass
 CREDS = os.path.join(DIR, "credentials.json")
 SNAPSHOT = os.path.join(DIR, "snapshot.json")
-VERSION = "2.0.1"
+WELCOMED = os.path.join(DIR, ".welcomed")
+VERSION = "2.1.0"
 
 
 # ───────────────────────────── style ─────────────────────────────
@@ -109,8 +110,24 @@ def fit(s, n, right=False):
     return pad + s if right else s + pad
 
 
-def banner():
-    art = [
+_BANNER_SHOWN = False
+
+
+def banner(force=False):
+    """Draw once per process — nested commands shouldn't repeat it."""
+    global _BANNER_SHOWN
+    if _BANNER_SHOWN and not force:
+        return
+    _BANNER_SHOWN = True
+    leaf = [
+        r"   .-.   ",
+        r"  ( ./   ",
+        r" \\\|//  ",
+        r"\\\\|/// ",
+        r"  \\|//  ",
+        r"    |    ",
+    ]
+    word = [
         "███████╗███████╗██████╗ ███╗   ██╗",
         "██╔════╝██╔════╝██╔══██╗████╗  ██║",
         "█████╗  █████╗  ██████╔╝██╔██╗ ██║",
@@ -118,11 +135,20 @@ def banner():
         "██║     ███████╗██║  ██║██║ ╚████║",
         "╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝",
     ]
-    ramp = [34, 35, 41, 42, 79, 80]          # deep green fading to teal
+    ramp = [34, 35, 41, 42, 79, 80]      # deep green fading to teal
+    leafc = [29, 35, 41, 42, 42, 35]     # frond, darker at the curl
+    narrow = shutil.get_terminal_size((80, 24)).columns < 48
     print()
-    for i, line in enumerate(art):
-        print("  " + (f"\033[38;5;{ramp[i]}m{line}\033[0m" if S.on else line))
-    print("  " + S.bold(S.green("A I")) + S.dim(f"   ·   your coursework, on tap  v{VERSION}"))
+    for i in range(6):
+        if narrow:
+            print("  " + (f"\033[38;5;{leafc[i]}m{leaf[i]}\033[0m" if S.on else leaf[i]))
+        else:
+            l = f"\033[38;5;{leafc[i]}m{leaf[i]}\033[0m" if S.on else leaf[i]
+            w = f"\033[38;5;{ramp[i]}m{word[i]}\033[0m" if S.on else word[i]
+            print("  " + l + " " + w)
+    pad = "" if narrow else " " * 10
+    print("  " + pad + S.bold(S.green("A I"))
+          + S.dim(f"   ·   your coursework, on tap  v{VERSION}"))
     print()
 
 
@@ -1085,6 +1111,73 @@ def ask_claude(prompt, session_id=None, stream=True):
     return text, sid
 
 
+def first_run():
+    return not os.path.exists(WELCOMED)
+
+
+def mark_welcomed():
+    os.makedirs(DIR, mode=0o700, exist_ok=True)
+    with open(WELCOMED, "w") as f:
+        f.write(datetime.now().astimezone().isoformat(timespec="seconds") + "\n")
+
+
+def welcome():
+    """Shown once, the first time someone runs `fern`."""
+    banner()
+    box("First time here", [
+        f"{S.bold('Fern knows your actual coursework')} — your classes, what's due,",
+        "what you're missing, and what each thing is worth. Then you just talk",
+        "to it: what to do tonight, why you're stuck, build me a study packet.",
+        "",
+        f"{S.gray('Nothing leaves this machine except the questions you type.')}",
+    ], S.green)
+    print()
+    print(f"  {S.bold('How do you want to start?')}")
+    print()
+    for n, label, note in [
+        ("1", "Try it with a fake semester", "no setup, works right now"),
+        ("2", "Connect my real Canvas", "needs an access token, ~2 min"),
+        ("3", "Just chat", "nothing loaded, ask it anything"),
+    ]:
+        print(f"    {S.cyan(n)}  {fit(S.bold(label), 30)}{S.gray(note)}")
+    print()
+
+    try:
+        pick = input(f"  {S.cyan(ARROW)} {S.gray('1, 2 or 3 (enter = 1)')}: ").strip() or "1"
+    except (EOFError, KeyboardInterrupt):
+        print()
+        pick = "3"
+
+    mark_welcomed()
+
+    if pick == "1":
+        print()
+        cmd_demo(argparse.Namespace(force=False))
+        print(f"  {S.gray('Try:')} {S.bold('what should i work on tonight')}")
+    elif pick == "2":
+        print()
+        info("The easiest way needs no token at all: in Claude Code run")
+        print(f"    {S.mag('/canvas')} {S.gray('and it reads the Canvas you are already logged into.')}")
+        print()
+        try:
+            go = input(f"  {S.cyan(ARROW)} Set up token access here instead? "
+                       f"{S.gray('y/N')}: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print(); go = "n"
+        if go.startswith("y"):
+            cmd_setup(argparse.Namespace(url=None, token=None, yes=False))
+        else:
+            print()
+            info(f"No problem. {S.cyan('fern demo')} gives you fake data any time,")
+            print(f"    {S.gray('or use')} {S.mag('/canvas')} {S.gray('in Claude Code for the real thing.')}")
+    else:
+        print()
+        info(f"Fine. {S.cyan('fern demo')} loads a fake semester whenever you want one.")
+
+    print()
+    rule()
+
+
 CHAT_HELP = [
     f"{S.cyan('/due')}       what's overdue and coming up",
     f"{S.cyan('/packet')}    build a study packet for a test",
@@ -1102,7 +1195,10 @@ CHAT_HELP = [
 
 
 def cmd_chat(args):
-    banner()
+    if first_run():
+        welcome()
+    else:
+        banner()
 
     if not have_claude():
         box("Chat needs the claude CLI", [
@@ -1349,6 +1445,9 @@ def main():
 
     sub.add_parser("doctor", help="why don't I see colors / why is chat broken") \
         .set_defaults(func=cmd_doctor)
+
+    sub.add_parser("welcome", help="replay the first-run setup") \
+        .set_defaults(func=lambda a: welcome())
 
     s = sub.add_parser("demo", help="load a fake semester to try this out")
     s.add_argument("-f", "--force", action="store_true", help="overwrite real coursework")
