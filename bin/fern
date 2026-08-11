@@ -49,7 +49,7 @@ SNAPSHOT = os.path.join(DIR, "snapshot.json")
 WELCOMED = os.path.join(DIR, ".welcomed")
 MEMORY = os.path.join(DIR, "memory.md")
 STATE = os.path.join(DIR, "state.json")
-VERSION = "2.8.1"
+VERSION = "2.9.1"
 
 
 # ───────────────────────────── style ─────────────────────────────
@@ -1424,10 +1424,16 @@ def ask_claude(prompt, session_id=None, stream=True):
 
             if t == "assistant":
                 for blk in (ev.get("message") or {}).get("content") or []:
-                    if blk.get("type") == "tool_use" and blk.get("name") == "Task":
+                    # the subagent tool is "Agent" in current Claude Code and was
+                    # "Task" in older builds — accept both.
+                    if (blk.get("type") == "tool_use"
+                            and blk.get("name") in ("Agent", "Task")):
                         inp = blk.get("input") or {}
-                        panel.add(blk.get("id"),
-                                  inp.get("description") or inp.get("subagent_type"))
+                        label = (inp.get("description") or inp.get("subagent_type")
+                                 or (inp.get("prompt") or "").strip().split("\n")[0])
+                        if sp:
+                            sp.clear()      # the panel is the progress now
+                        panel.add(blk.get("id"), label)
             elif t == "user":
                 for blk in (ev.get("message") or {}).get("content") or []:
                     if blk.get("type") == "tool_result":
