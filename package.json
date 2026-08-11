@@ -1,0 +1,44 @@
+{
+  "name": "fern-ai",
+  "version": "2.2.0",
+  "description": "Chat with your actual coursework. Pulls assignments and grades from Canvas, then triages, plans, tutors, and builds study packets \u2014 as Claude skills plus a terminal CLI.",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "claude-skills",
+    "canvas",
+    "canvas-lms",
+    "student",
+    "school",
+    "study",
+    "cli",
+    "homework"
+  ],
+  "homepage": "https://github.com/connorprecisionworks-sys/fernai#readme",
+  "bugs": "https://github.com/connorprecisionworks-sys/fernai/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/connorprecisionworks-sys/fernai.git"
+  },
+  "license": "MIT",
+  "author": "Connor",
+  "type": "commonjs",
+  "bin": {
+    "fern": "bin/fern.js"
+  },
+  "files": [
+    "bin/fern",
+    "bin/fern.js",
+    "skills/",
+    "examples/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ]
+}
