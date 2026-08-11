@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-bts — Back To School
+fern — Fern AI
 
-Just run `bts` to start talking. Ask about your classes, get tutored, work out
+Just run `fern` to start talking. Ask about your classes, get tutored, work out
 what to do tonight.
 
-  bts              chat (default)
-  bts demo         load a fake semester and try it without Canvas
-  bts doctor       check colors, PATH, and the claude CLI
-  bts packet       build a study packet from your course materials
-  bts ask "..."    one question, one answer
-  bts due          what's overdue and what's this week
-  bts sync         refresh coursework from Canvas
-  bts setup        guided Canvas setup
-  bts status       what's configured
-  bts revoke       delete the saved token
+  fern              chat (default)
+  fern demo         load a fake semester and try it without Canvas
+  fern doctor       check colors, PATH, and the claude CLI
+  fern packet       build a study packet from your course materials
+  fern ask "..."    one question, one answer
+  fern due          what's overdue and what's this week
+  fern sync         refresh coursework from Canvas
+  fern setup        guided Canvas setup
+  fern status       what's configured
+  fern revoke       delete the saved token
 
 Chat is a thin wrapper around the `claude` CLI you already have — no extra API
 key. Everything else is stdlib only and stays on this machine.
@@ -35,10 +35,16 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-DIR = os.path.expanduser("~/.claude/canvas")
+DIR = os.path.expanduser("~/.claude/fern")
+_OLD = os.path.expanduser("~/.claude/canvas")
+if os.path.isdir(_OLD) and not os.path.exists(DIR):
+    try:
+        os.rename(_OLD, DIR)          # carry over anything from the fern days
+    except OSError:
+        pass
 CREDS = os.path.join(DIR, "credentials.json")
 SNAPSHOT = os.path.join(DIR, "snapshot.json")
-VERSION = "1.6.0"
+VERSION = "2.0.0"
 
 
 # ───────────────────────────── style ─────────────────────────────
@@ -105,19 +111,18 @@ def fit(s, n, right=False):
 
 def banner():
     art = [
-        "██████╗  █████╗  ██████╗██╗  ██╗    ████████╗ ██████╗",
-        "██╔══██╗██╔══██╗██╔════╝██║ ██╔╝    ╚══██╔══╝██╔═══██╗",
-        "██████╔╝███████║██║     █████╔╝        ██║   ██║   ██║",
-        "██╔══██╗██╔══██║██║     ██╔═██╗        ██║   ██║   ██║",
-        "██████╔╝██║  ██║╚██████╗██║  ██╗       ██║   ╚██████╔╝",
-        "╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝       ╚═╝    ╚═════╝",
+        "███████╗███████╗██████╗ ███╗   ██╗",
+        "██╔════╝██╔════╝██╔══██╗████╗  ██║",
+        "█████╗  █████╗  ██████╔╝██╔██╗ ██║",
+        "██╔══╝  ██╔══╝  ██╔══██╗██║╚██╗██║",
+        "██║     ███████╗██║  ██║██║ ╚████║",
+        "╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝",
     ]
-    ramp = [39, 38, 44, 43, 79, 80]
+    ramp = [34, 35, 41, 42, 79, 80]          # deep green fading to teal
     print()
     for i, line in enumerate(art):
         print("  " + (f"\033[38;5;{ramp[i]}m{line}\033[0m" if S.on else line))
-    sub = "S C H O O L"
-    print("  " + S.bold(S.cyan(sub)) + S.dim(f"   ·   coursework CLI  v{VERSION}"))
+    print("  " + S.bold(S.green("A I")) + S.dim(f"   ·   your coursework, on tap  v{VERSION}"))
     print()
 
 
@@ -204,7 +209,7 @@ class Spinner:
 
 def load_creds(quiet=False):
     if not os.path.exists(CREDS):
-        die("Not set up yet.", "Run:  bts setup")
+        die("Not set up yet.", "Run:  fern setup")
     with open(CREDS) as f:
         return json.load(f)
 
@@ -244,7 +249,7 @@ def get(url, token, params=None):
     except urllib.error.HTTPError as e:
         if e.code == 401:
             die("Canvas rejected the token (401).",
-                "It's wrong, expired, or revoked. Make a new one, then: bts setup")
+                "It's wrong, expired, or revoked. Make a new one, then: fern setup")
         if e.code == 403:
             die("Canvas refused the request (403).",
                 "Your school may have API tokens disabled. Use the /canvas skill instead.")
@@ -323,14 +328,14 @@ def parse_due(s):
 RISK_LINES = [
     f"{S.bold('This saves a Canvas access token on this computer.')}",
     "",
-    f"{S.yellow('1.')} The token acts as you. It's stored at ~/.claude/canvas/",
+    f"{S.yellow('1.')} The token acts as you. It's stored at ~/.claude/fern/",
     f"   credentials.json, chmod 0600, {S.bold('not encrypted')}.",
     f"{S.yellow('2.')} Never commit it, paste it in chat, or share it.",
     f"{S.yellow('3.')} Many schools restrict or ban API tokens. {S.bold('Check your policy.')}",
-    f"{S.yellow('4.')} bts only sends GET requests — it can't change anything in",
+    f"{S.yellow('4.')} fern only sends GET requests — it can't change anything in",
     f"   Canvas. But the token itself is full-access. Something else could.",
     f"{S.yellow('5.')} {S.bold('Set an expiry date')} on the token. End of semester.",
-    f"{S.yellow('6.')} {S.bold('bts revoke')} deletes the local copy — it does NOT invalidate",
+    f"{S.yellow('6.')} {S.bold('fern revoke')} deletes the local copy — it does NOT invalidate",
     "   the token. Also remove it in Canvas → Approved Integrations.",
     "",
     f"{S.gray('The /canvas skill reads your browser instead and needs none of this.')}",
@@ -389,10 +394,10 @@ def cmd_setup(args):
 
     print()
     box("You're set", [
-        f"{S.cyan('bts due')}      {S.gray('what is overdue and due this week')}",
-        f"{S.cyan('bts sync')}     {S.gray('refresh from Canvas')}",
-        f"{S.cyan('bts status')}   {S.gray('what is configured')}",
-        f"{S.cyan('bts revoke')}   {S.gray('delete the saved token')}",
+        f"{S.cyan('fern due')}      {S.gray('what is overdue and due this week')}",
+        f"{S.cyan('fern sync')}     {S.gray('refresh from Canvas')}",
+        f"{S.cyan('fern status')}   {S.gray('what is configured')}",
+        f"{S.cyan('fern revoke')}   {S.gray('delete the saved token')}",
         "",
         f"{S.gray('In Claude Code:')}  {S.mag('/due')}  {S.mag('/triage')}  "
         f"{S.mag('/plan-week')}  {S.mag('/cram')}",
@@ -468,7 +473,7 @@ def cmd_status(args):
             f"{S.yellow('Not configured')} — no token saved.",
             "",
             f"{S.gray('Browser mode still works:')} run {S.mag('/canvas')} in Claude Code.",
-            f"{S.gray('For the CLI:')} {S.cyan('bts setup')}",
+            f"{S.gray('For the CLI:')} {S.cyan('fern setup')}",
         ], S.yellow)
         print()
         return
@@ -488,7 +493,7 @@ def cmd_status(args):
         if when:
             mins = (datetime.now(timezone.utc).astimezone() - when).total_seconds() / 60
             age = S.gray(f"  ({int(mins)}m ago)") if mins < 90 else \
-                  S.yellow(f"  ({mins/60:.0f}h ago — run: bts sync)")
+                  S.yellow(f"  ({mins/60:.0f}h ago — run: fern sync)")
         n = sum(len(x["assignments"]) for x in snap["courses"])
         lines += [
             f"{fit(S.gray('snapshot'), 12)}{snap.get('pulled_at', '?')}{age}",
@@ -499,7 +504,7 @@ def cmd_status(args):
             g = x.get("current_grade") or S.gray("—")
             lines.append(f"  {fit(S.bold(x['name']), 12)}{g}")
     else:
-        lines.append(f"{fit(S.gray('snapshot'), 12)}none — run {S.cyan('bts sync')}")
+        lines.append(f"{fit(S.gray('snapshot'), 12)}none — run {S.cyan('fern sync')}")
     box("Status", lines)
     print()
 
@@ -526,7 +531,7 @@ def cmd_revoke(args):
 
 def cmd_due(args):
     if not os.path.exists(SNAPSHOT):
-        die("No coursework saved yet.", "Run:  bts sync")
+        die("No coursework saved yet.", "Run:  fern sync")
     with open(SNAPSHOT) as f:
         snap = json.load(f)
 
@@ -786,7 +791,7 @@ DEMO_SEMESTER = {'pulled_at': None,
 
 HISTFILE = os.path.join(DIR, "history")
 
-PERSONA = """You are the assistant inside `bts`, a terminal tool a student uses for school.
+PERSONA = """You are Fern, the assistant inside the `fern` CLI, which a student uses for school.
 
 ## The one rule that matters
 
@@ -861,7 +866,7 @@ studied, their work schedule — ask ONE short question, then answer."""
 def coursework_context():
     if not os.path.exists(SNAPSHOT):
         return ("No coursework has been synced yet. If they ask about assignments, "
-                "tell them to run `bts sync` (or `/canvas` in Claude Code) once.")
+                "tell them to run `fern sync` (or `/canvas` in Claude Code) once.")
     with open(SNAPSHOT) as f:
         snap = json.load(f)
     now = datetime.now().astimezone()
@@ -988,7 +993,7 @@ def ask_claude(prompt, session_id=None, stream=True):
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     except FileNotFoundError:
         die("The `claude` CLI isn't installed.",
-            "Install Claude Code, then run bts again: https://claude.com/claude-code")
+            "Install Claude Code, then run fern again: https://claude.com/claude-code")
 
     text, sid, started = "", session_id, False
     md = MDStream()
@@ -1073,15 +1078,15 @@ def cmd_chat(args):
 
     if not have_claude():
         box("Chat needs the claude CLI", [
-            f"{S.bold('bts chat runs on the `claude` CLI')} — that's how there's no second",
+            f"{S.bold('fern chat runs on the `claude` CLI')} — that's how there's no second",
             "API key to set up. It isn't on your PATH right now.",
             "",
             f"  {S.cyan('https://claude.com/claude-code')}",
             "",
             "Everything else works without it:",
-            f"  {S.cyan('bts demo')}    load a fake semester",
-            f"  {S.cyan('bts due')}     what's overdue and coming up",
-            f"  {S.cyan('bts status')}  what's configured",
+            f"  {S.cyan('fern demo')}    load a fake semester",
+            f"  {S.cyan('fern due')}     what's overdue and coming up",
+            f"  {S.cyan('fern status')}  what's configured",
         ], S.yellow)
         print()
         sys.exit(1)
@@ -1104,8 +1109,8 @@ def cmd_chat(args):
         n = sum(len(c["assignments"]) for c in snap["courses"])
         info(f"{len(snap['courses'])} courses, {n} assignments loaded")
     else:
-        warn("No coursework synced. Run `bts demo` to try it with fake data,")
-        warn("or `bts setup` / `/canvas` to pull in your real classes.")
+        warn("No coursework synced. Run `fern demo` to try it with fake data,")
+        warn("or `fern setup` / `/canvas` to pull in your real classes.")
     info(f"Ask anything. {S.cyan('/help')} for commands, {S.cyan('/exit')} to quit.")
     print()
 
@@ -1171,7 +1176,7 @@ def cmd_chat(args):
 
 
 def cmd_demo(args):
-    """Load a fake but realistic semester so you can try bts without Canvas."""
+    """Load a fake but realistic semester so you can try fern without Canvas."""
     import copy
     data = copy.deepcopy(DEMO_SEMESTER)
 
@@ -1190,7 +1195,7 @@ def cmd_demo(args):
             existing = json.load(f)
         if existing.get("source") != "demo":
             die("You already have real coursework synced.",
-                "`bts demo --force` overwrites it. To keep a copy first:\n"
+                "`fern demo --force` overwrites it. To keep a copy first:\n"
                 f"    cp {SNAPSHOT} ~/coursework-backup.json")
 
     write_private(SNAPSHOT, data)
@@ -1200,12 +1205,12 @@ def cmd_demo(args):
         f"{len(data['courses'])} courses, {n} assignments — dated relative to today, so",
         "there's always something overdue and something due tomorrow.",
         "",
-        f"{S.cyan('bts')}          start chatting about it",
-        f"{S.cyan('bts due')}      see the list",
-        f"{S.cyan('bts packet')}   build a study packet for the CHEM midterm",
+        f"{S.cyan('fern')}          start chatting about it",
+        f"{S.cyan('fern due')}      see the list",
+        f"{S.cyan('fern packet')}   build a study packet for the CHEM midterm",
         "",
         f"{S.gray('Fake data. Nothing is connected to a real Canvas.')}",
-        f"{S.gray('Clear it with:')} {S.cyan('bts revoke --all')}",
+        f"{S.gray('Clear it with:')} {S.cyan('fern revoke --all')}",
     ], S.green)
     print()
 
@@ -1235,8 +1240,8 @@ def cmd_doctor(args):
     c = shutil.which("claude")
     (ok if c else warn)(f"claude CLI: {c or 'not found — chat will not work'}")
 
-    me = shutil.which("bts")
-    (ok if me else warn)(f"bts on PATH: {me or 'no — you are running it by path'}")
+    me = shutil.which("fern")
+    (ok if me else warn)(f"fern on PATH: {me or 'no — you are running it by path'}")
 
     if os.path.exists(SNAPSHOT):
         with open(SNAPSHOT) as f:
@@ -1244,7 +1249,7 @@ def cmd_doctor(args):
         src = snap.get("source", "browser")
         ok(f"coursework: {len(snap['courses'])} courses ({src})")
     else:
-        warn("coursework: none — run `bts demo` for fake data")
+        warn("coursework: none — run `fern demo` for fake data")
 
     print()
     rule("color test")
@@ -1262,7 +1267,7 @@ def cmd_doctor(args):
 
 def cmd_packet(args):
     if not have_claude():
-        die("`bts packet` needs the `claude` CLI.")
+        die("`fern packet` needs the `claude` CLI.")
     what = " ".join(args.about) if args.about else ""
     print()
     ask_claude(f"/packet {what}".strip(), None)
@@ -1271,16 +1276,16 @@ def cmd_packet(args):
 
 def cmd_ask(args):
     if not have_claude():
-        die("`bts ask` needs the `claude` CLI.", "Try:  bts due")
+        die("`fern ask` needs the `claude` CLI.", "Try:  fern due")
     print()
     ask_claude(" ".join(args.question), None)
     print()
 
 
 def main():
-    p = argparse.ArgumentParser(prog="bts", description=__doc__,
+    p = argparse.ArgumentParser(prog="fern", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--version", action="version", version=f"bts {VERSION}")
+    p.add_argument("--version", action="version", version=f"fern {VERSION}")
     sub = p.add_subparsers(dest="cmd")
 
     s = sub.add_parser("setup", help="guided setup")

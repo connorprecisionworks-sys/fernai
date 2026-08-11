@@ -12,7 +12,7 @@ The fastest thing in this toolkit. One list, no analysis, no plan, no advice.
 
 ## Do this
 
-1. Read `~/.claude/canvas/snapshot.json`.
+1. Read `~/.claude/fern/snapshot.json`.
    - Missing? Run the `canvas` skill, then continue.
    - Older than ~6 hours? Refresh it first, quietly.
 2. Get today's date with `date` — do not assume it.
@@ -39,9 +39,9 @@ Nothing due: say "Nothing due in the next 7 days." and stop.
 
 ## Rules
 
-- **Prefer the CLI if it's installed:** `bts due` prints this exact list,
+- **Prefer the CLI if it's installed:** `fern due` prints this exact list,
   formatted and colored, in about 50ms. Run it and show the output. Only build
-  the list by hand if `bts` isn't on PATH.
+  the list by hand if `fern` isn't on PATH.
 - Groups, in this order: `OVERDUE`, `TODAY`, `TOMORROW`, `THIS WEEK`,
   `NO DUE DATE`. Skip any group that's empty. Never invent other groups.
 - **Copy the course code exactly as it appears in the snapshot.** Don't

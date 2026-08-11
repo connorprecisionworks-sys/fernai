@@ -1,17 +1,17 @@
 {
-  "name": "back-to-school-skills",
-  "description": "Claude skills for students",
+  "name": "fern-ai",
+  "description": "Fern AI — Claude skills for students",
   "owner": {
     "name": "Connor",
     "url": "https://github.com/connorprecsionworks-sys"
   },
   "plugins": [
     {
-      "name": "back-to-school",
-      "displayName": "Back to School",
-      "description": "Eleven Claude skills plus the bts chat CLI for students: pulls real assignments and grades from Canvas, then handles triage, weekly planning, tutoring, cramming, drafting, and emails.",
+      "name": "fern-ai",
+      "displayName": "Fern AI",
+      "description": "Eleven Claude skills plus the fern chat CLI for students: pulls real assignments and grades from Canvas, then handles triage, weekly planning, tutoring, cramming, study packets, drafting, and emails.",
       "source": "./",
-      "version": "1.6.0",
+      "version": "2.0.0",
       "license": "MIT",
       "category": "productivity",
       "keywords": ["students", "school", "study", "tutoring", "education"]

@@ -5,4 +5,4 @@ __pycache__/
 # never commit Canvas credentials or personal coursework
 credentials.json
 snapshot.json
-.claude/canvas/
+.claude/fern/

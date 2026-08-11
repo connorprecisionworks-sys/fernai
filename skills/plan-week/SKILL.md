@@ -8,7 +8,7 @@ argument-hint: [your classes, work hours, and what's due this week]
 
 Input: $ARGUMENTS
 
-**Check `~/.claude/canvas/snapshot.json` first** — if it's there, that's the
+**Check `~/.claude/fern/snapshot.json` first** — if it's there, that's the
 deadline list, and the syllabus data tells you what each thing is worth. Refresh
 with the `canvas` skill if it's stale. If it doesn't exist and they use Canvas,
 offer `/canvas`. Then ask what Canvas doesn't know: work shifts, practice,

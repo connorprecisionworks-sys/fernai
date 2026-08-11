@@ -13,7 +13,7 @@ where the top item is unambiguously the right thing to open right now.
 
 ## Step 1 — Get the data (fast)
 
-**Check `~/.claude/canvas/snapshot.json` first.** If it exists, that's the
+**Check `~/.claude/fern/snapshot.json` first.** If it exists, that's the
 assignment list — use it and skip the interview. Mention when it was pulled;
 if it's more than a day old, run the `canvas` skill to refresh. If the file
 doesn't exist and they have Canvas, offer `/canvas` — it takes about a minute

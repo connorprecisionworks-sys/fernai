@@ -1,4 +1,4 @@
-# Back to School — Claude Skills for Students
+# Fern AI — Claude Skills for Students
 
 Eleven skills plus a CLI that turn Claude into something actually useful during a semester.
 Install once, then type `/due`, `/triage`, `/cram` and go.
@@ -26,47 +26,47 @@ good at that thing would actually follow.
 ## Install
 
 ```bash
-git clone https://github.com/connorprecsionworks-sys/back-to-school-skills.git
-cd back-to-school-skills
+git clone https://github.com/connorprecsionworks-sys/fern-ai.git
+cd fern-ai
 ./install.sh
 ```
 
-That copies the skills to `~/.claude/skills/` and puts the `bts` CLI on your
+That copies the skills to `~/.claude/skills/` and puts the `fern` CLI on your
 PATH. Restart Claude Code, type `/`, and they're there.
 
 Manual version, if you'd rather see what's happening:
 
 ```bash
 cp -R skills/* ~/.claude/skills/
-install -m 755 bin/bts ~/.local/bin/bts
+install -m 755 bin/fern ~/.local/bin/fern
 ```
 
 ### Try it right now — no Canvas needed
 
 ```bash
-bts demo     # loads a fake semester, dated relative to today
-bts          # start chatting about it
+fern demo     # loads a fake semester, dated relative to today
+fern          # start chatting about it
 ```
 
-The banner and the boxes show up on `bts`, `bts demo`, `bts setup` and
-`bts doctor`. The data commands (`bts due`, `bts status`) skip the banner on
+The banner and the boxes show up on `fern`, `fern demo`, `fern setup` and
+`fern doctor`. The data commands (`fern due`, `fern status`) skip the banner on
 purpose — you run those twenty times a day.
 
-**Not seeing colors?** Run `bts doctor`. Usual causes: output is piped or
+**Not seeing colors?** Run `fern doctor`. Usual causes: output is piped or
 redirected (colors auto-disable — override with `FORCE_COLOR=1`), `NO_COLOR`
-is set in your shell, or `TERM=dumb`. It also checks whether `bts` and
+is set in your shell, or `TERM=dumb`. It also checks whether `fern` and
 `claude` are actually on your PATH.
 
 You get five courses with real-looking grades, three overdue assignments, a
 problem set due tomorrow and a midterm in eleven days. Clear it any time with
-`bts revoke --all`.
+`fern revoke --all`.
 
 ### The CLI
 
-Just run `bts`. It opens a chat:
+Just run `fern`. It opens a chat:
 
 ```
-❯ bts
+❯ fern
 
   ✓ 5 courses, 22 assignments loaded
   Ask anything. /help for commands, /exit to quit.
@@ -105,10 +105,10 @@ from inside the chat too.
 Prefer one-shot? Every command also works directly:
 
 ```
-bts ask "when is my chem midterm"
-bts packet "chem 240 midterm, ch 1-7"
-bts due                    # just the list, no chat
-bts demo / sync / setup / status / revoke
+fern ask "when is my chem midterm"
+fern packet "chem 240 midterm, ch 1-7"
+fern due                    # just the list, no chat
+fern demo / sync / setup / status / revoke
 ```
 
 **Chat needs the [`claude` CLI](https://claude.com/claude-code)** — it wraps
@@ -117,16 +117,16 @@ Everything that isn't chat (`due`, `sync`, `status`) is pure stdlib Python and
 works without it.
 
 Output is colored and boxed on a terminal and degrades to clean plain text
-when piped or when `NO_COLOR` is set — so `bts due | grep CHEM` works fine.
+when piped or when `NO_COLOR` is set — so `fern due | grep CHEM` works fine.
 
 ### Option B — install as a plugin
 
 ```
-/plugin marketplace add connorprecsionworks-sys/back-to-school-skills
-/plugin install back-to-school@back-to-school-skills
+/plugin marketplace add connorprecsionworks-sys/fern-ai
+/plugin install fern-ai@fern-ai
 ```
 
-Commands are namespaced this way: `/back-to-school:tutor`.
+Commands are namespaced this way: `/fern-ai:tutor`.
 
 ### Option C — one skill only
 
@@ -150,7 +150,7 @@ Start of semester, run once:
 ```
 
 It opens a tab in your browser, reads the Canvas you're already logged into,
-and saves everything to `~/.claude/canvas/snapshot.json`. After that:
+and saves everything to `~/.claude/fern/snapshot.json`. After that:
 
 ```
 /due                    what's overdue and what's this week
@@ -197,7 +197,7 @@ extension. Two fallbacks if you don't have it or it breaks:
 - **Paste** — copy your assignments page and paste it in. Always works, takes
   30 seconds.
 
-Your snapshot lives at `~/.claude/canvas/snapshot.json` on your own machine.
+Your snapshot lives at `~/.claude/fern/snapshot.json` on your own machine.
 Nothing is uploaded anywhere. Delete the file and it's gone.
 
 Other LMS? The `canvas` skill is a page-reading procedure, not Canvas-specific
@@ -218,20 +218,20 @@ difference and you get exact data instead of parsed pages:
 | School policy | always fine         | **check yours** |
 
 ```bash
-bts setup
+fern setup
 ```
 
 A four-step wizard. It prints the risks and won't save anything until you type
 `I ACCEPT`. Then:
 
 ```bash
-bts sync                # -> snapshot.json, same format as browser mode
-bts sync --course chem  # one course
-bts due                 # the list, straight in your terminal
-bts status              # what's configured (never prints the token)
-bts test                # is the token still good
-bts revoke              # delete the local token
-bts revoke --all        # ...and the coursework snapshot
+fern sync                # -> snapshot.json, same format as browser mode
+fern sync --course chem  # one course
+fern due                 # the list, straight in your terminal
+fern status              # what's configured (never prints the token)
+fern test                # is the token still good
+fern revoke              # delete the local token
+fern revoke --all        # ...and the coursework snapshot
 ```
 
 `/due`, `/triage`, `/plan-week` and `/cram` don't care which mode produced the
@@ -239,7 +239,7 @@ snapshot — they work the same either way.
 
 **The deal you're accepting:**
 
-- Your token lives at `~/.claude/canvas/credentials.json`, mode `0600`,
+- Your token lives at `~/.claude/fern/credentials.json`, mode `0600`,
   **unencrypted**. Anyone who can read that file can act as you in Canvas.
 - The script only ever sends `GET` requests — it can't submit, delete, or
   change anything. But the token itself is a full-access credential. Something
@@ -256,7 +256,7 @@ shows it once. Never paste it into a chat, a repo, or a command line argument
 (`ps` and your shell history can see argv — let the script prompt you).
 
 Stdlib Python only, no dependencies, one file. Read it before you run it:
-[`bin/bts`](bin/bts).
+[`bin/fern`](bin/fern).
 
 ## Why it doesn't just tell you to go study
 
@@ -264,7 +264,7 @@ The default failure mode of every study tool is handing back a block of time.
 "Set aside 5 hours for the chem midterm" is useless — you already knew you
 should study, and nobody volunteers for a 5-hour block.
 
-So `bts` is built around two rules:
+So `fern` is built around two rules:
 
 **Offer to make the thing, don't assign the time.** The answer to "I'm behind
 in chem" is a study packet built from that professor's slides and the problem
@@ -302,7 +302,7 @@ rubric — do that part.
 ## Repo layout
 
 ```
-back-to-school-skills/
+fern-ai/
 ├── skills/
 │   ├── packet/SKILL.md            <- builds the HTML study packets
 │   ├── canvas/SKILL.md            <- browser mode, writes the snapshot
@@ -316,7 +316,7 @@ back-to-school-skills/
 │   ├── email/SKILL.md
 │   └── learn/SKILL.md
 ├── bin/
-│   └── bts                        <- the CLI
+│   └── fern                        <- the CLI
 ├── .claude-plugin/
 │   ├── plugin.json
 │   └── marketplace.json

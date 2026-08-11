@@ -13,12 +13,12 @@ password, nothing stored but a local JSON file of their coursework.
 
 ## Fast path — check for dev mode first
 
-If `~/.claude/canvas/credentials.json` exists, the student opted into API
+If `~/.claude/fern/credentials.json` exists, the student opted into API
 mode. Just run the script and skip everything below — it's 3 seconds instead
 of a minute:
 
 ```bash
-bts sync
+fern sync
 ```
 
 Then jump to **Report back**. If it errors, fall through to browser mode and
@@ -79,7 +79,7 @@ you what percentage of the grade each category is worth.
 
 ## Save the snapshot
 
-Write to `~/.claude/canvas/snapshot.json`:
+Write to `~/.claude/fern/snapshot.json`:
 
 ```json
 {

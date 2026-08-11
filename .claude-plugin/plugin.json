@@ -1,12 +1,12 @@
 {
-  "name": "back-to-school",
-  "displayName": "Back to School",
-  "description": "Eleven Claude skills plus the bts chat CLI for students: pulls real assignments and grades from Canvas, then handles triage, weekly planning, tutoring, cramming, drafting, and emails.",
-  "version": "1.6.0",
+  "name": "fern-ai",
+  "displayName": "Fern AI",
+  "description": "Eleven Claude skills plus the fern chat CLI for students: pulls real assignments and grades from Canvas, then handles triage, weekly planning, tutoring, cramming, study packets, drafting, and emails.",
+  "version": "2.0.0",
   "author": {
     "name": "Connor"
   },
-  "repository": "https://github.com/connorprecsionworks-sys/back-to-school-skills",
+  "repository": "https://github.com/connorprecsionworks-sys/fern-ai",
   "license": "MIT",
   "keywords": ["students", "school", "study", "tutoring", "productivity", "education"]
 }

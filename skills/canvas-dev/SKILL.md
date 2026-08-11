@@ -13,8 +13,8 @@ it means a token sits on this machine. **This is opt-in and the student
 accepts the risk.** Default everyone to `/canvas` (browser) unless they ask
 for this specifically.
 
-CLI: `bts` (installed by `install.sh` to `~/.local/bin/bts`).
-If `bts` isn't on PATH, run it directly from the repo: `./bin/bts`.
+CLI: `fern` (installed by `install.sh` to `~/.local/bin/fern`).
+If `fern` isn't on PATH, run it directly from the repo: `./bin/fern`.
 
 ## Show the tradeoff first
 
@@ -42,11 +42,11 @@ Canvas → Account → Settings → **"+ New Access Token"**.
   control that limits the blast radius if the token ever leaks.
 - Canvas shows the token **once**. Copy it.
 
-**2. Run setup.** `bts` prints the risk notice and requires the student
+**2. Run setup.** `fern` prints the risk notice and requires the student
 to type `I ACCEPT` before it saves anything:
 
 ```bash
-bts setup
+fern setup
 ```
 
 It prompts for the Canvas URL and reads the token with hidden input.
@@ -64,24 +64,24 @@ one — it's now in a conversation log.
 ## Commands
 
 ```bash
-bts setup              # guided setup (requires typing "I ACCEPT")
-bts sync               # fetch everything -> snapshot.json
-bts sync --course chem # one course only
-bts due                # overdue + next 7 days, straight in the terminal
-bts status             # what's configured (never shows the token)
-bts test               # is the token still good
-bts revoke             # delete the local token
-bts revoke --all       # ...and the coursework snapshot
+fern setup              # guided setup (requires typing "I ACCEPT")
+fern sync               # fetch everything -> snapshot.json
+fern sync --course chem # one course only
+fern due                # overdue + next 7 days, straight in the terminal
+fern status             # what's configured (never shows the token)
+fern test               # is the token still good
+fern revoke             # delete the local token
+fern revoke --all       # ...and the coursework snapshot
 ```
 
-`bts sync` writes `~/.claude/canvas/snapshot.json` in the same format the browser
+`fern sync` writes `~/.claude/fern/snapshot.json` in the same format the browser
 path produces, so `/due`, `/triage`, `/plan-week`, and `/cram` work identically
 either way. The only difference is `"source": "api"`.
 
-## What bts does and doesn't do
+## What fern does and doesn't do
 
 - **GET requests only.** It cannot submit, delete, or change anything.
-- Token at `~/.claude/canvas/credentials.json`, mode `0600`, unencrypted.
+- Token at `~/.claude/fern/credentials.json`, mode `0600`, unencrypted.
 - Stdlib Python only, single file. No dependencies, no network calls anywhere but their
   own Canvas.
 - Nothing is uploaded. Everything stays on their machine.
@@ -97,12 +97,12 @@ Say that plainly if they ask.
 - **No token option in Canvas settings** — the school turned it off. Same
   answer: use `/canvas`.
 - **Missing assignments** — the course may be unpublished, concluded, or the
-  assignment has no due date. `bts sync` only includes active enrollments.
+  assignment has no due date. `fern sync` only includes active enrollments.
 
 ## Revoking
 
 ```bash
-bts revoke
+fern revoke
 ```
 
 Then tell them the part people forget: **deleting the local file does not
