@@ -114,11 +114,34 @@ It knows your actual courses, grades, and deadlines, and it remembers the
 conversation. Inside the chat:
 
 ```
-/due       show the assignment list      /new    fresh conversation
-/packet    build a study packet          /help   commands
-/sync      refresh from Canvas           /exit   quit
-/status    what's configured
+/due       show the assignment list      /new      fresh conversation
+/packet    build a study packet          /memory   what fern remembers
+/sync      refresh from Canvas           /forget   wipe that memory
+/status    what's configured             /exit     quit
 ```
+
+### It remembers
+
+Two kinds, both on your machine only.
+
+**The conversation** picks up where you left off if you were here in the last
+12 hours — close the terminal mid-thought and come back to it. `/new` starts
+clean.
+
+**Durable facts** outlive that, in a plain markdown file at
+`~/.claude/fern/memory.md`: your work shifts, when your classes meet, that you
+underestimate writing time, topics you keep losing points on, that you'd rather
+have practice quizzes than flashcards. Fern adds to it as it learns, so it
+stops asking things you already told it.
+
+```bash
+fern memory           # see it
+fern memory --edit    # it's your file, change anything
+fern memory --clear   # wipe it
+```
+
+It won't store your coursework there (that re-syncs) or anything you didn't
+volunteer, and it stays under 60 lines so it can't bloat your prompts.
 
 Any *other* slash command is handed straight to Claude, so `/tutor`,
 `/triage`, `/plan-week`, `/cram`, `/draft`, `/email` and `/learn` all work

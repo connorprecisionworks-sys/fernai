@@ -6,7 +6,8 @@ Just run `fern` to start talking. Ask about your classes, get tutored, work out
 what to do tonight.
 
   fern              chat (default)
-  fern install      add the 11 skills to Claude Code
+  fern memory       what fern remembers about you
+  fern install      add the skills to Claude Code
   fern demo         load a fake semester and try it without Canvas
   fern doctor       check colors, PATH, and the claude CLI
   fern packet       build a study packet from your course materials
@@ -46,7 +47,9 @@ if os.path.isdir(_OLD) and not os.path.exists(DIR):
 CREDS = os.path.join(DIR, "credentials.json")
 SNAPSHOT = os.path.join(DIR, "snapshot.json")
 WELCOMED = os.path.join(DIR, ".welcomed")
-VERSION = "2.6.0"
+MEMORY = os.path.join(DIR, "memory.md")
+STATE = os.path.join(DIR, "state.json")
+VERSION = "2.7.0"
 
 
 # ───────────────────────────── style ─────────────────────────────
@@ -1114,6 +1117,16 @@ def draftable_soon(days=8):
     return n
 
 
+def skill_available(name):
+    """Only route to a skill that's actually installed — `/packet` sent to a
+    Claude Code with no packet skill fails the whole turn."""
+    for base in (os.path.expanduser("~/.claude/skills"),
+                 os.path.join(os.getcwd(), ".claude", "skills")):
+        if os.path.isfile(os.path.join(base, name, "SKILL.md")):
+            return True
+    return False
+
+
 def route(prompt):
     """Pick a skill from plain phrasing so nobody needs the slash commands.
 
@@ -1125,16 +1138,20 @@ def route(prompt):
     for skill, pat in ROUTES:
         if re.search(pat, low):
             if skill not in ("batch", "draft"):
-                return skill
+                break
             # Workload decides the fan-out, not the wording. "Draft everything"
             # with two items left is just a draft; "the lab report and the memo"
             # with six due really is a batch.
             plural = bool(re.search(r"\b(all|everything|both|and|each|every)\b", low))
             many = draftable_soon() >= 3
             if skill == "batch":
-                return "batch" if many else "draft"
-            return "batch" if (plural and many) else "draft"
-    return None
+                skill = "batch" if many else "draft"
+            else:
+                skill = "batch" if (plural and many) else "draft"
+            break
+    else:
+        return None
+    return skill if skill_available(skill) else None
 
 
 def have_claude():
@@ -1216,8 +1233,21 @@ class MDStream:
         self.buf = ""
         self.fence = False       # inside a ``` block
         self.blank = True        # last line emitted was blank
+        self.facts = []          # <remember> payloads, stripped from output
+        self.drops = []          # <forget> payloads
+
+    def _harvest(self, line):
+        def take(mo):
+            (self.drops if mo.group(1).lower() == "forget" else self.facts
+             ).append(mo.group(2))
+            return ""
+        return REMEMBER_RE.sub(take, line)
 
     def _emit(self, line):
+        if "<remember" in line.lower() or "<forget" in line.lower():
+            line = self._harvest(line)
+            if not line.strip():
+                return
         if self.fence:
             # preformatted: print as-is, no wrapping, no markdown
             print("  " + line.rstrip())
@@ -1252,9 +1282,15 @@ def ask_claude(prompt, session_id=None, stream=True):
     """Send one turn to the claude CLI. Returns (text, session_id)."""
     skill = route(prompt) if session_id is None else route(prompt)
     sent = f"/{skill} {prompt}" if skill else prompt
+    sys_prompt = PERSONA + "\n\n<coursework>\n" + coursework_context() + "\n</coursework>"
+    mem = load_memory()
+    if mem:
+        sys_prompt += ("\n\n<remembered>\nThings you have learned about this "
+                       "student in past conversations. Use them; do not ask again.\n"
+                       + mem + "\n</remembered>")
+    sys_prompt += MEMORY_RULE
     cmd = ["claude", "-p", sent,
-           "--append-system-prompt",
-           PERSONA + "\n\n<coursework>\n" + coursework_context() + "\n</coursework>"]
+           "--append-system-prompt", sys_prompt]
     if session_id:
         cmd += ["--resume", session_id]
     cmd += ["--output-format", "stream-json", "--include-partial-messages", "--verbose"]
@@ -1311,6 +1347,7 @@ def ask_claude(prompt, session_id=None, stream=True):
             sp.clear()
         if stream:
             md.flush()
+        remember(md.facts, md.drops)
 
     if api_error:
         low = api_error.lower()
@@ -1340,6 +1377,104 @@ def ask_claude(prompt, session_id=None, stream=True):
         die("claude exited with an error.", err.splitlines()[-1] if err else None)
 
     return text, sid
+
+
+MEMORY_HEADER = """# What fern remembers about you
+
+<!-- Fern writes here as it learns things. It is a plain text file you own:
+     edit it, delete lines, or wipe it with `fern memory --clear`.
+     Do not put anything here you would not want in a prompt. -->
+"""
+
+
+def load_memory():
+    if not os.path.exists(MEMORY):
+        return None
+    try:
+        with open(MEMORY) as f:
+            keep, in_comment = [], False
+            for l in f.read().splitlines():
+                s = l.strip()
+                if in_comment:
+                    in_comment = "-->" not in s
+                    continue
+                if s.startswith("<!--"):
+                    in_comment = "-->" not in s
+                    continue
+                if s.startswith("# "):          # the file title only
+                    continue
+                keep.append(l)                  # ## section headings stay
+            body = "\n".join(keep)
+        body = body.strip()
+        return body[:4000] if body else None
+    except OSError:
+        return None
+
+
+def load_state():
+    try:
+        with open(STATE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_state(**kw):
+    s = load_state()
+    s.update(kw)
+    write_private(STATE, s)
+
+
+def cmd_memory(args):
+    if args.clear:
+        if os.path.exists(MEMORY):
+            os.remove(MEMORY)
+            print()
+            ok("Memory cleared.")
+        else:
+            print()
+            info("Nothing stored yet.")
+        print()
+        return
+    if args.edit:
+        ed = os.environ.get("EDITOR") or os.environ.get("VISUAL") or "nano"
+        if not os.path.exists(MEMORY):
+            write_private(MEMORY, None) if False else None
+            os.makedirs(DIR, mode=0o700, exist_ok=True)
+            with open(MEMORY, "w") as f:
+                f.write(MEMORY_HEADER)
+            os.chmod(MEMORY, 0o600)
+        subprocess.call([ed, MEMORY])
+        return
+    print()
+    mem = load_memory()
+    if not mem:
+        box("Memory", [
+            "Nothing stored yet.",
+            "",
+            S.gray("Fern writes here as it learns durable things — your work"),
+            S.gray("shifts, how long assignments actually take you, topics you"),
+            S.gray("keep losing points on, how you like to study."),
+            "",
+            f"{S.gray('Edit by hand:')} {S.cyan('fern memory --edit')}",
+        ])
+    else:
+        shown = []
+        for l in mem.splitlines():
+            s = l.strip()
+            if s.startswith("##"):
+                if shown and shown[-1] != "":
+                    shown.append("")
+                shown.append(S.bold(S.cyan(s.lstrip("#").strip().upper())))
+            else:
+                shown.append(md_line(l).strip() or "")
+        while shown and shown[0] == "":
+            shown.pop(0)
+        box("Memory", shown[:40] + ["", S.gray(MEMORY)])
+        print()
+        info(f"{S.cyan('fern memory --edit')} to change it, "
+             f"{S.cyan('--clear')} to wipe it.")
+    print()
 
 
 def first_run():
@@ -1439,12 +1574,97 @@ def welcome():
     print()
 
 
+REMEMBER_RE = re.compile(r"<(remember|forget)>(.*?)</\1>", re.I | re.S)
+
+MEMORY_RULE = """
+
+## Remembering
+
+When you learn something **durable** about this student, emit a tag on its own
+line anywhere in your reply:
+
+    <remember>Works Tue/Thu 4-9pm at the campus bookstore</remember>
+    <remember>Focuses best late at night</remember>
+    <forget>Taking ENGL 205</forget>
+
+The tags are stripped before the student sees anything — they are a side
+channel, not part of your answer. Never mention them, never say "I'll remember
+that", just emit and carry on. One fact per tag, one short line each.
+`<forget>` removes any stored line containing that text.
+
+Emit them the moment you learn something, in the same reply — not later.
+
+Worth remembering: their work or practice schedule, when their classes
+actually meet, how long things really take them versus their estimate, topics
+they keep losing points on, how they like to study, a professor's quirks, their
+major, what they've told you not to suggest again.
+
+Not worth remembering: anything already in the coursework block below (it
+re-syncs), one-off state like "is working on the memo tonight", or your own
+advice. Never store anything sensitive — no grades beyond what Canvas already
+shows, no personal details they did not volunteer.
+
+Keep the whole file under 40 lines. When it gets long, merge and prune rather
+than appending forever. Group under simple `##` headings like Schedule, How
+they work, Courses.
+
+If they tell you to forget something, emit `<forget>`.
+"""
+
+
+def remember(facts, drops):
+    """Append learned facts to memory.md, prune anything forgotten."""
+    if not facts and not drops:
+        return
+    os.makedirs(DIR, mode=0o700, exist_ok=True)
+    try:
+        existing = open(MEMORY).read() if os.path.exists(MEMORY) else MEMORY_HEADER
+    except OSError:
+        return
+    lines = existing.splitlines()
+
+    for d in drops:
+        d = d.strip().lower()
+        if d:
+            lines = [l for l in lines if d not in l.lower()]
+
+    have = {re.sub(r"[^a-z0-9]", "", l.lower()) for l in lines}
+    fresh = []
+    for f in facts:
+        f = " ".join(f.split())[:160]
+        key = re.sub(r"[^a-z0-9]", "", f.lower())
+        if f and key and key not in have:
+            have.add(key)
+            fresh.append("- " + f)
+
+    if fresh:
+        if "## Learned" not in existing:
+            lines += ["", "## Learned"]
+        idx = max(i for i, l in enumerate(lines) if l.strip() == "## Learned")
+        end = idx + 1
+        while end < len(lines) and not lines[end].startswith("## "):
+            end += 1
+        lines[end:end] = fresh
+
+    # keep it small — this goes into every prompt
+    body = "\n".join(lines).rstrip() + "\n"
+    if body.count("\n") > 60:
+        keep = [l for l in body.splitlines() if l.strip()]
+        body = "\n".join(keep[:60]) + "\n"
+    fd = os.open(MEMORY, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as fh:
+        fh.write(body)
+    os.chmod(MEMORY, 0o600)
+
+
 CHAT_HELP = [
     f"{S.cyan('/due')}       what's overdue and coming up",
     f"{S.cyan('/packet')}    build a study packet for a test",
     f"{S.cyan('/sync')}      refresh coursework from Canvas",
     f"{S.cyan('/status')}    what's configured",
     f"{S.cyan('/new')}       start a fresh conversation",
+    f"{S.cyan('/memory')}    what fern remembers about you",
+    f"{S.cyan('/forget')}    wipe that memory and start over",
     f"{S.cyan('/help')}      this list",
     f"{S.cyan('/exit')}      quit  " + S.gray("(or ctrl-d)"),
     "",
@@ -1505,6 +1725,18 @@ def cmd_chat(args):
     print()
 
     sid = None
+    st = load_state()
+    prev, when = st.get("session_id"), parse_due(st.get("session_at"))
+    if prev and when:
+        age = (datetime.now().astimezone() - when).total_seconds() / 3600
+        if age < 12:
+            sid = prev
+            mins = int(age * 60)
+            ago = f"{mins}m ago" if mins < 90 else f"{age:.0f}h ago"
+            info(f"Picking up where you left off ({ago}). "
+                 f"{S.cyan('/new')} for a clean slate.")
+            print()
+
     while True:
         try:
             line = input(f"{S.cyan(S.bold(ARROW))} ").strip()
@@ -1527,8 +1759,18 @@ def cmd_chat(args):
             continue
         if low == "/new":
             sid = None
-            ok("Fresh conversation.")
+            save_state(session_id=None, session_at=None)
+            ok("Fresh conversation. What fern remembers about you is kept — "
+               "see /memory.")
             print()
+            continue
+        if low == "/memory":
+            cmd_memory(argparse.Namespace(edit=False, clear=False))
+            continue
+        if low == "/forget":
+            sid = None
+            save_state(session_id=None, session_at=None)
+            cmd_memory(argparse.Namespace(edit=False, clear=True))
             continue
         if low == "/due":
             cmd_due(argparse.Namespace(days=7))
@@ -1549,6 +1791,10 @@ def cmd_chat(args):
         print()
         try:
             _, sid = ask_claude(line, sid)
+            if sid:
+                save_state(session_id=sid,
+                           session_at=datetime.now().astimezone().isoformat(
+                               timespec="seconds"))
         except KeyboardInterrupt:
             print()
             info("Stopped.")
@@ -1761,6 +2007,11 @@ def main():
 
     sub.add_parser("welcome", help="replay the first-run setup") \
         .set_defaults(func=lambda a: welcome())
+
+    s = sub.add_parser("memory", help="what fern remembers about you")
+    s.add_argument("--edit", action="store_true", help="open it in $EDITOR")
+    s.add_argument("--clear", action="store_true", help="wipe it")
+    s.set_defaults(func=cmd_memory)
 
     s = sub.add_parser("install", help="install the Claude Code skills")
     s.add_argument("-f", "--force", action="store_true", help="overwrite existing")
