@@ -46,7 +46,7 @@ if os.path.isdir(_OLD) and not os.path.exists(DIR):
 CREDS = os.path.join(DIR, "credentials.json")
 SNAPSHOT = os.path.join(DIR, "snapshot.json")
 WELCOMED = os.path.join(DIR, ".welcomed")
-VERSION = "2.2.0"
+VERSION = "2.3.0"
 
 
 # ───────────────────────────── style ─────────────────────────────
@@ -76,8 +76,25 @@ class S:
     inv    = staticmethod(lambda s: S._w("7", s))
 
 
-TICK, CROSS, DOT, ARROW = "✓", "✗", "•", "❯"
-BAR = "│"
+# Terminals sometimes report a legacy encoding even when they render UTF-8
+# fine. Ask for UTF-8, and fall back to replacing unencodable glyphs rather
+# than dying mid-banner.
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+UTF = "utf" in (getattr(sys.stdout, "encoding", "") or "").lower()
+
+if UTF:
+    TICK, CROSS, DOT, ARROW, BAR = "✓", "✗", "•", "❯", "│"
+    TL, TR, BL, BR, HZ = "╭", "╮", "╰", "╯", "─"
+    SPIN = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+else:
+    TICK, CROSS, DOT, ARROW, BAR = "+", "x", "-", ">", "|"
+    TL, TR, BL, BR, HZ = "+", "+", "+", "+", "-"
+    SPIN = "|/-\\"
 
 
 def width():
@@ -120,13 +137,21 @@ def banner(force=False):
     if _BANNER_SHOWN and not force:
         return
     _BANNER_SHOWN = True
+    fancy = UTF
     leaf = [
-        r"   .-.   ",
-        r"  ( ./   ",
-        r" \\\|//  ",
-        r"\\\\|/// ",
-        r"  \\|//  ",
-        r"    |    ",
+        r"     ╭╮   ",
+        r"   ╲╲▐╯   ",
+        r"  ╲╲╲▐╱╱  ",
+        r" ╲╲╲╲▐╱╱╱ ",
+        r"  ╲╲╲▐╱╱  ",
+        r"     ▐    ",
+    ] if fancy else [
+        r"     ,-.  ",
+        r"   \\\|/   ",
+        r"  \\\\|//  ",
+        r" \\\\\\|/// ",
+        r"  \\\\|//  ",
+        r"     |    ",
     ]
     word = [
         "███████╗███████╗██████╗ ███╗   ██╗",
@@ -136,6 +161,11 @@ def banner(force=False):
         "██║     ███████╗██║  ██║██║ ╚████║",
         "╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝",
     ]
+    if not fancy:
+        word = ["  ___ ___ ___  _  _ ", " | __| __| _ \\| \\| |",
+                " | _|| _||   /| .` |", " |_| |___|_|_\\|_|\\_|",
+                "", ""]
+        leaf = leaf[:4] + ["", ""]
     ramp = [34, 35, 41, 42, 79, 80]      # deep green fading to teal
     leafc = [29, 35, 41, 42, 42, 35]     # frond, darker at the curl
     narrow = shutil.get_terminal_size((80, 24)).columns < 48
@@ -153,23 +183,31 @@ def banner(force=False):
     print()
 
 
+def clear_screen():
+    """Put the banner at the top of a fresh screen — npx and shell noise above
+    it makes the whole thing look like a log line instead of an app."""
+    if S.on and sys.stdout.isatty() and os.environ.get("FERN_NO_CLEAR") is None:
+        sys.stdout.write("\033[2J\033[3J\033[H")
+        sys.stdout.flush()
+
+
 def rule(label=""):
     w = width()
     if label:
-        head = f"── {label} "
-        print(S.dim(head + "─" * max(0, w - vis(head))))
+        head = f"{HZ}{HZ} {label} "
+        print(S.dim(head + HZ * max(0, w - vis(head))))
     else:
-        print(S.dim("─" * w))
+        print(S.dim(HZ * w))
 
 
 def box(title, lines, color=S.cyan):
     w = width()
     t = f" {title} "
-    print(color("╭─") + color(t) + color("─" * max(0, w - 4 - len(t))) + color("╮"))
+    print(color(TL + HZ) + color(t) + color(HZ * max(0, w - 4 - len(t))) + color(TR))
     for ln in lines:
         pad = max(0, w - 4 - vis(ln))
         print(color(BAR) + " " + ln + " " * pad + " " + color(BAR))
-    print(color("╰" + "─" * (w - 2) + "╯"))
+    print(color(BL + HZ * (w - 2) + BR))
 
 
 def step(n, total, label):
@@ -193,7 +231,7 @@ def die(msg, hint=None):
 
 
 class Spinner:
-    FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+    FRAMES = SPIN
 
     def __init__(self, text):
         self.text, self.stop, self.t = text, False, None
@@ -1124,6 +1162,7 @@ def mark_welcomed():
 
 def welcome():
     """Shown once, the first time someone runs `fern`."""
+    clear_screen()
     banner()
     box("First time here", [
         f"{S.bold('Fern knows your actual coursework')} — your classes, what's due,",
@@ -1187,7 +1226,25 @@ def welcome():
             cmd_install(argparse.Namespace(force=False))
 
     print()
-    rule()
+    if os.path.exists(SNAPSHOT):
+        box("You're in", [
+            f"{S.bold('Type a question and press enter.')} That's the whole interface.",
+            "",
+            f"  {S.cyan('what should i work on tonight')}",
+            f"  {S.cyan('whats due this week')}",
+            f"  {S.cyan('build me a study packet for the chem midterm')}",
+            "",
+            f"{S.gray('/help for commands  ·  /due for the list  ·  /exit to quit')}",
+        ], S.green)
+    else:
+        box("You're in", [
+            f"{S.bold('Type a question and press enter.')} That's the whole interface.",
+            "",
+            f"{S.gray('No coursework loaded, so it will not know your classes yet.')}",
+            f"  {S.cyan('fern demo')}   load a fake semester",
+            f"  {S.mag('/canvas')}     in Claude Code, to pull your real one",
+        ], S.green)
+    print()
 
 
 CHAT_HELP = [
@@ -1207,9 +1264,11 @@ CHAT_HELP = [
 
 
 def cmd_chat(args):
-    if first_run():
+    just_welcomed = first_run()
+    if just_welcomed:
         welcome()
     else:
+        clear_screen()
         banner()
 
     if not have_claude():
@@ -1239,7 +1298,9 @@ def cmd_chat(args):
         readline = None
 
     have_snap = os.path.exists(SNAPSHOT)
-    if have_snap:
+    if just_welcomed:
+        pass                      # the welcome box already covered all of this
+    elif have_snap:
         with open(SNAPSHOT) as f:
             snap = json.load(f)
         n = sum(len(c["assignments"]) for c in snap["courses"])
@@ -1247,7 +1308,8 @@ def cmd_chat(args):
     else:
         warn("No coursework synced. Run `fern demo` to try it with fake data,")
         warn("or `fern setup` / `/canvas` to pull in your real classes.")
-    info(f"Ask anything. {S.cyan('/help')} for commands, {S.cyan('/exit')} to quit.")
+    if not just_welcomed:
+        info(f"Ask anything. {S.cyan('/help')} for commands, {S.cyan('/exit')} to quit.")
     print()
 
     sid = None
