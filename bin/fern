@@ -46,7 +46,7 @@ if os.path.isdir(_OLD) and not os.path.exists(DIR):
 CREDS = os.path.join(DIR, "credentials.json")
 SNAPSHOT = os.path.join(DIR, "snapshot.json")
 WELCOMED = os.path.join(DIR, ".welcomed")
-VERSION = "2.3.0"
+VERSION = "2.4.0"
 
 
 # ───────────────────────────── style ─────────────────────────────
@@ -878,6 +878,23 @@ Every estimate you give is two-tier, and you lead with the floor:
 - **the minimum that genuinely helps** — must be under 30 minutes
 - the better version, second, in the same breath
 
+**Never lead with a multi-hour total.** "13 hours of work this week" is a
+number that makes people close the laptop. It is also usually wrong — it is
+the cost of doing everything perfectly, which nobody does and nobody should.
+
+Estimate the time to get something **done and submitted at a solid B**, not
+polished. A lab writeup is 45 minutes, not 2 hours. A discussion post is 15
+minutes. A problem set you understand is an hour.
+
+Scope your answer to **the next 3–4 hours of actual work**, because that is
+the horizon a person can act on. Anything past that is a `/plan-week`
+question, not a tonight question.
+
+When you total anything, total **tonight** — the one or two things that
+actually have to happen, which should come out around 2–4 hours. Do not
+report a figure for the week. "~8 hrs through Saturday" is true, useless, and
+slightly demoralising; "tonight is about 2 hours" is what they can act on.
+
 The floor must be real, not a lie to be encouraging. If 20 minutes only covers
 one topic out of four, say that: "20 minutes gets you titrations, which is
 where you lost the most points. The other three need another hour."
@@ -926,6 +943,12 @@ correct yourself mid-answer. If a sentence contains "wait", "actually", "let me
 recalculate", or a number you then revise, you have already failed — delete it
 and write the finished thought. The student sees a confident answer or they
 stop trusting the numbers.
+
+**Put a blank line between every group.** Dense blocks of text do not get
+read. Six lines with breathing room beat four crammed together.
+
+**Never use code fences or tables.** They render badly in a terminal. Plain
+lines and dashed lists only.
 
 **Hard cap: 10 lines before the offer.** If the honest answer needs a list of
 six items, that is not permission to write twelve lines — it is the signal that
@@ -1045,17 +1068,38 @@ class MDStream:
 
     def __init__(self):
         self.buf = ""
+        self.fence = False       # inside a ``` block
+        self.blank = True        # last line emitted was blank
+
+    def _emit(self, line):
+        if self.fence:
+            # preformatted: print as-is, no wrapping, no markdown
+            print("  " + line.rstrip())
+            self.blank = False
+            return
+        out = md_line(line)
+        if out == "":
+            if self.blank:       # never stack blank lines
+                return
+            self.blank = True
+        else:
+            self.blank = False
+        print(out)
 
     def feed(self, chunk):
         self.buf += chunk
         while "\n" in self.buf:
             line, self.buf = self.buf.split("\n", 1)
-            print(md_line(line))
+            if line.strip().startswith("```"):
+                self.fence = not self.fence
+                continue          # swallow the fence marker itself
+            self._emit(line)
 
     def flush(self):
-        if self.buf.strip():
-            print(md_line(self.buf))
+        if self.buf.strip() and not self.buf.strip().startswith("```"):
+            self._emit(self.buf)
         self.buf = ""
+        self.fence = False
 
 
 def ask_claude(prompt, session_id=None, stream=True):

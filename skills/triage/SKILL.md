@@ -72,15 +72,41 @@ If it doesn't fit, say so directly. Do not produce a plan that requires a
 
 ## Output format
 
-```
-NOW        <item> — <why it's first, one line> — <hours>
-NEXT       <item> — <hours>
-TODAY      <item>, <item>
-THIS WEEK  <item>, <item>
-DROP/DEFER <item> — <cost of dropping>
-```
+Plain lines, no code fences, no tables — this gets read in a terminal. **A
+blank line between every group.** Density is what makes triage unreadable, and
+an unread plan is the same as no plan.
 
-Then: total hours needed vs. hours available. One line.
+    NOW
+      45m   CHEM 240 PS3 — due tomorrow 11:59pm, 40 pts, not started
+
+    NEXT
+      20m   CHEM lab safety module — missing since Aug 7, click-through
+
+    THIS WEEK
+      Thu   MATH HW2 + Quiz 1, HIST reading response
+      Fri   ENGL memo — 60 pts, the big one
+      Sat   BIOL Lab 2
+
+    SKIP
+      HIST term paper proposal — not due till Aug 29, costs nothing to wait
+
+**Time goes at the front of the line, never the end.** A terminal wraps long
+lines, and a trailing "— 45m" orphans onto its own row where it reads as
+noise. Keep each item under about 65 characters so it never wraps at all.
+
+Two or three items per group, maximum, and **at most four groups**. If a group
+needs six items you are listing rather than triaging — merge them into one line
+and move on. NOW should hold exactly one thing.
+
+**Estimate honestly but not perfectionistically.** Time to done and submitted
+at a solid B, not polished: a lab writeup is 45 minutes, a discussion post is
+15, a problem set you follow is an hour. Inflated estimates are why students
+bounce off plans.
+
+Then one line: **what tonight actually costs** — NOW plus NEXT only, which
+should land in the 2–4 hour range. Never report a total for the week; it is
+demoralising and it is not a number anyone acts on. If the week genuinely does
+not fit, say so in one sentence and name what gets cut.
 
 Then: **the single next physical action** — not "start the essay" but "open a
 doc and write the thesis sentence." The first action must be small enough that
