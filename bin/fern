@@ -46,7 +46,7 @@ if os.path.isdir(_OLD) and not os.path.exists(DIR):
 CREDS = os.path.join(DIR, "credentials.json")
 SNAPSHOT = os.path.join(DIR, "snapshot.json")
 WELCOMED = os.path.join(DIR, ".welcomed")
-VERSION = "2.5.0"
+VERSION = "2.6.0"
 
 
 # ───────────────────────────── style ─────────────────────────────
@@ -949,8 +949,17 @@ press a key instead of writing a sentence:
       2  Practice quiz
       3  Study packet
 
-For several deliverables at once, use the `batch` skill: it fans out one
-subagent per assignment and queues the questions.
+**Choose the skill yourself — that is your job, not theirs.** Nobody should
+have to know a slash command exists. Judge by how much work the request
+actually covers, not by how it was phrased:
+
+- **three or more deliverables** → the `batch` skill. It fans out one subagent
+  per assignment in parallel and queues the questions. "Make drafts of
+  everything I need this week" with six items due is a batch job, always.
+- **one deliverable** → `draft`, `email`, or `packet` directly.
+
+If they do type an explicit `/command`, that is a deliberate choice — honour it
+exactly, even if you'd have picked something else.
 
 ## Always end with a thing you can do for them
 
@@ -1025,8 +1034,13 @@ def coursework_context():
     with open(SNAPSHOT) as f:
         snap = json.load(f)
     now = datetime.now().astimezone()
+    n = draftable_soon()
     out = [f"Today is {now.strftime('%A %B %-d, %Y')} ({now.strftime('%-I:%M%p').lower()}).",
-           f"Coursework synced {snap.get('pulled_at', '?')}.", ""]
+           f"Coursework synced {snap.get('pulled_at', '?')}.",
+           f"Draftable items due in the next 8 days: {n}."
+           + ("  Three or more, so any 'do my work' style request is a `batch`"
+              " job — fan out one subagent per item, in parallel." if n >= 3 else ""),
+           ""]
     for c in snap["courses"]:
         g = c.get("current_grade")
         out.append(f"{c['name']} — {c.get('full_name') or ''}"
@@ -1070,14 +1084,56 @@ ROUTES = [
 ]
 
 
+NOT_DRAFTABLE = re.compile(
+    r"\b(quiz|exam|midterm|final|test|problem set|\bps\d|homework|hw\d|"
+    r"module|worksheet|attendance|survey)\b", re.I)
+
+
+def draftable_soon(days=8):
+    """How many things due soon are actually worth drafting. This is what
+    decides batch-vs-single — the phrasing can't know, the workload can."""
+    if not os.path.exists(SNAPSHOT):
+        return 0
+    try:
+        with open(SNAPSHOT) as f:
+            snap = json.load(f)
+    except (OSError, ValueError):
+        return 0
+    now = datetime.now().astimezone()
+    horizon = now + timedelta(days=days)
+    n = 0
+    for c in snap.get("courses", []):
+        for a in c.get("assignments", []):
+            if a.get("status") in ("submitted", "graded"):
+                continue
+            if NOT_DRAFTABLE.search(a.get("title") or ""):
+                continue
+            d = parse_due(a.get("due"))
+            if d is None or d <= horizon:
+                n += 1
+    return n
+
+
 def route(prompt):
-    """Map plain phrasing onto a skill so nobody has to know the slash commands."""
+    """Pick a skill from plain phrasing so nobody needs the slash commands.
+
+    A leading /command means the human chose deliberately — never override it.
+    """
     if os.environ.get("FERN_NO_ROUTE") or prompt.lstrip().startswith("/"):
         return None
     low = prompt.lower()
     for skill, pat in ROUTES:
         if re.search(pat, low):
-            return skill
+            if skill not in ("batch", "draft"):
+                return skill
+            # Workload decides the fan-out, not the wording. "Draft everything"
+            # with two items left is just a draft; "the lab report and the memo"
+            # with six due really is a batch.
+            plural = bool(re.search(r"\b(all|everything|both|and|each|every)\b", low))
+            many = draftable_soon() >= 3
+            if skill == "batch":
+                return "batch" if many else "draft"
+            return "batch" if (plural and many) else "draft"
     return None
 
 
