@@ -44,7 +44,7 @@ if os.path.isdir(_OLD) and not os.path.exists(DIR):
         pass
 CREDS = os.path.join(DIR, "credentials.json")
 SNAPSHOT = os.path.join(DIR, "snapshot.json")
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 
 
 # ───────────────────────────── style ─────────────────────────────
@@ -191,18 +191,20 @@ class Spinner:
         self.t.start()
         return self
 
-    def done(self, text=None):
+    def clear(self):
         self.stop = True
         if self.t:
             self.t.join()
-            sys.stdout.write("\r\033[K")
+            self.t = None
+            if S.on:
+                sys.stdout.write("\r\033[K")
+
+    def done(self, text=None):
+        self.clear()
         ok(text or self.text)
 
     def __exit__(self, *a):
-        self.stop = True
-        if self.t:
-            self.t.join()
-            sys.stdout.write("\r\033[K")
+        self.clear()
 
 
 # ───────────────────────────── storage ─────────────────────────────
@@ -827,7 +829,10 @@ instruction to go feel motivated. Things you can actually make:
 - a draft to react to — `/draft`
 - an email to a professor — `/email`
 
-Offer exactly one, the one that fits. Never list options like a menu.
+**Offer exactly one.** Not two. Never "Want me to check X, or jump to Y?" —
+that hands the decision back to a student who is already overloaded, which is
+the thing you are supposed to be removing. Pick the higher-value one and offer
+only that. They can ask for the other.
 
 If there's genuinely nothing to make, then the next step is a *physical*
 action, small enough that refusing it feels silly: "open the lab doc and write
@@ -851,9 +856,17 @@ You are good at this and specific about it. When you estimate:
 Terminal output, so: no markdown headers, no tables, no emoji, nothing wider
 than 76 columns. Short lines. Front-load the answer.
 
-Under 10 lines before the offer. If you're writing a twelfth line you've
-already lost them — that's the "attention keeping" bar and it applies to you,
-not just to the study material.
+**Do the arithmetic before you start writing.** Never think out loud, never
+correct yourself mid-answer. If a sentence contains "wait", "actually", "let me
+recalculate", or a number you then revise, you have already failed — delete it
+and write the finished thought. The student sees a confident answer or they
+stop trusting the numbers.
+
+**Hard cap: 10 lines before the offer.** If the honest answer needs a list of
+six items, that is not permission to write twelve lines — it is the signal that
+this is a `/triage` or `/plan-week` question. Name the top two, then offer the
+skill that handles the rest. A wall of text is the exact failure this tool
+exists to prevent, and it applies to you, not just to the study material.
 
 Never open with "Great question." No encouragement unless they ask. No
 "you've got this."
@@ -995,7 +1008,7 @@ def ask_claude(prompt, session_id=None, stream=True):
         die("The `claude` CLI isn't installed.",
             "Install Claude Code, then run fern again: https://claude.com/claude-code")
 
-    text, sid, started = "", session_id, False
+    text, sid, started, api_error = "", session_id, False, None
     md = MDStream()
     sp = Spinner("thinking") if stream else None
     if sp:
@@ -1019,34 +1032,49 @@ def ask_claude(prompt, session_id=None, stream=True):
                     if chunk:
                         if not started:
                             if sp:
-                                sp.stop = True
-                                if sp.t:
-                                    sp.t.join()
-                                sys.stdout.write("\r\033[K")
+                                sp.clear()
                             started = True
                         if stream:
                             md.feed(chunk)
                         text += chunk
             elif t == "result":
+                if ev.get("is_error") or ev.get("subtype") not in (None, "success"):
+                    api_error = (ev.get("result") or "").strip() or "unknown error"
+                    break
                 if not text:
                     text = ev.get("result", "") or ""
                     if stream and text:
                         if sp and not started:
-                            sp.stop = True
-                            if sp.t:
-                                sp.t.join()
-                            sys.stdout.write("\r\033[K")
+                            sp.clear()
                             started = True
                         md.feed(text)
         proc.wait()
     finally:
         if sp and not started:
-            sp.stop = True
-            if sp.t:
-                sp.t.join()
-            sys.stdout.write("\r\033[K")
+            sp.clear()
         if stream:
             md.flush()
+
+    if api_error:
+        low = api_error.lower()
+        def has(*words):
+            return any(re.search(r"\b" + w + r"\w*", low) for w in words)
+        hint = None
+        if has("unauthorized", "authenticat", "login", "forbidden"):
+            hint = "Run:  claude   and sign in."
+        elif has("certificate", "ssl", "proxy", "network", "connect", "timeout", "dns"):
+            hint = "Network problem. `fern due` and `fern status` still work offline."
+        elif has("rate", "quota", "overloaded", "429"):
+            hint = "Rate limited — wait a moment and ask again."
+        elif has("credit", "billing"):
+            hint = "Check your Claude plan or billing."
+        print()
+        lines = ansi_wrap(api_error.strip()[:400], width() - 4)
+        if hint:
+            lines += ["", S.gray(hint)]
+        box("Claude returned an error", lines, S.red)
+        print()
+        return "", sid
 
     if proc.returncode != 0 and not text:
         err = (proc.stderr.read() or "").strip()
