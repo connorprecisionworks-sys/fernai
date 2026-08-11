@@ -26,7 +26,7 @@ good at that thing would actually follow.
 ## Install
 
 ```bash
-git clone https://github.com/YOUR-GITHUB-USERNAME/back-to-school-skills.git
+git clone https://github.com/connorprecsionworks-sys/back-to-school-skills.git
 cd back-to-school-skills
 ./install.sh
 ```
@@ -122,7 +122,7 @@ when piped or when `NO_COLOR` is set — so `bts due | grep CHEM` works fine.
 ### Option B — install as a plugin
 
 ```
-/plugin marketplace add YOUR-GITHUB-USERNAME/back-to-school-skills
+/plugin marketplace add connorprecsionworks-sys/back-to-school-skills
 /plugin install back-to-school@back-to-school-skills
 ```
 
