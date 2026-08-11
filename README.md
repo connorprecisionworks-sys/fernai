@@ -1,6 +1,6 @@
 # Fern AI — Claude Skills for Students
 
-Eleven skills plus a CLI that turn Claude into something actually useful during a semester.
+Thirteen skills plus a CLI that turn Claude into something actually useful during a semester.
 Install once, then type `/due`, `/triage`, `/cram` and go.
 
 It reads your real Canvas assignments, so the plans are about your actual
@@ -13,6 +13,8 @@ good at that thing would actually follow.
 |--------------|--------------|
 | `/canvas`    | Pulls your assignments, due dates, and grades out of Canvas via your logged-in browser. No token, no password. |
 | `/canvas-dev`| Opt-in: direct Canvas API access with your own token. Faster, but you accept the risks. |
+| `/research`  | Finds and vets real sources, grades them A/B/C, and files them where `/draft` picks them up. |
+| `/batch`     | Fans out one agent per assignment and drafts your whole week in parallel. |
 | `/packet`    | Builds a study packet from your teacher's slides and your graded work — active recall, not a wall of notes. |
 | `/due`       | "What's due?" in five seconds. Overdue first, then the week. Nothing else. |
 | `/triage`    | Your whole workload → one ranked do-this-next list. Tells you when it doesn't fit. |
@@ -26,20 +28,49 @@ good at that thing would actually follow.
 ## Install
 
 ```bash
-git clone https://github.com/connorprecsionworks-sys/fern-ai.git
-cd fern-ai
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/connorprecisionworks-sys/fernai/main/install.sh | bash
 ```
 
-That copies the skills to `~/.claude/skills/` and puts the `fern` CLI on your
-PATH. Restart Claude Code, type `/`, and they're there.
-
-Manual version, if you'd rather see what's happening:
+Then just:
 
 ```bash
-cp -R skills/* ~/.claude/skills/
-install -m 755 bin/fern ~/.local/bin/fern
+fern
 ```
+
+That's the whole thing. The installer downloads Fern, puts the thirteen skills
+in `~/.claude/skills/`, and installs the `fern` command somewhere already on
+your PATH — and if there's nowhere suitable, it adds one to your shell profile
+and tells you. No sudo, no npm permissions, no PATH archaeology.
+
+Only needs Python 3.8+, which macOS and Linux already have. Restart Claude Code
+afterwards so it picks up the skills.
+
+<details>
+<summary>Other ways in</summary>
+
+**Try it without installing** — needs Node:
+
+```bash
+npx github:connorprecisionworks-sys/fernai
+```
+
+**From a clone**, same installer:
+
+```bash
+git clone https://github.com/connorprecisionworks-sys/fernai.git
+cd fernai && ./install.sh
+```
+
+**While developing**, symlink so `fern` always runs your working copy:
+
+```bash
+mkdir -p ~/bin && ln -sf "$PWD/bin/fern" ~/bin/fern
+```
+
+**Skills only, no CLI:** `fern install`.
+
+**Uninstall:** remove `~/.local/bin/fern`, `~/.claude/skills/*`, `~/.claude/fern/`.
+</details>
 
 ### Try it right now — no Canvas needed
 
@@ -167,7 +198,7 @@ when piped or when `NO_COLOR` is set — so `fern due | grep CHEM` works fine.
 ### Option B — install as a plugin
 
 ```
-/plugin marketplace add connorprecsionworks-sys/fern-ai
+/plugin marketplace add connorprecisionworks-sys/fernai
 /plugin install fern-ai@fern-ai
 ```
 

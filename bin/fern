@@ -49,7 +49,7 @@ SNAPSHOT = os.path.join(DIR, "snapshot.json")
 WELCOMED = os.path.join(DIR, ".welcomed")
 MEMORY = os.path.join(DIR, "memory.md")
 STATE = os.path.join(DIR, "state.json")
-VERSION = "2.8.0"
+VERSION = "2.8.1"
 
 
 # ───────────────────────────── style ─────────────────────────────
@@ -1933,7 +1933,8 @@ def cmd_chat(args):
 
 def bundled_skills():
     """Where the SKILL.md folders live next to this script, if they shipped."""
-    here = os.path.dirname(os.path.abspath(__file__))
+    # realpath, not abspath — a symlinked `fern` must still find its skills
+    here = os.path.dirname(os.path.realpath(__file__))
     for cand in (os.path.join(here, "..", "skills"), os.path.join(here, "skills")):
         if os.path.isdir(cand):
             return os.path.abspath(cand)

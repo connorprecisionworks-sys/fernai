@@ -1,6 +1,6 @@
 {
   "name": "fern-ai",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "description": "Chat with your actual coursework. Pulls assignments and grades from Canvas, then triages, plans, tutors, and builds study packets \u2014 as Claude skills plus a terminal CLI.",
   "keywords": [
     "claude",
