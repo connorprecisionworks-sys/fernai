@@ -26,7 +26,7 @@ good at that thing would actually follow.
 ## Install
 
 ```bash
-git clone https://github.com/connorprecsionworks-sys/fern-ai.git
+git clone https://github.com/connorprecisionworks-sys/fernai.git
 cd fern-ai
 ./install.sh
 ```
@@ -122,7 +122,7 @@ when piped or when `NO_COLOR` is set — so `fern due | grep CHEM` works fine.
 ### Option B — install as a plugin
 
 ```
-/plugin marketplace add connorprecsionworks-sys/fern-ai
+/plugin marketplace add connorprecisionworks-sys/fernai
 /plugin install fern-ai@fern-ai
 ```
 
