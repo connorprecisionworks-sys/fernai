@@ -25,6 +25,12 @@ Before writing a word, extract and restate:
 
 If any of these are unknown, ask before drafting. One message, all questions.
 
+**Check `~/Desktop/fern-research/` first.** If a research file exists for this
+course or topic, read it — the vetted sources, the counterargument, and the
+"use it for" notes are already there, and re-finding them wastes their time.
+If the assignment needs sources and no research file exists, run `research`
+before drafting rather than inventing citations.
+
 ## Step 2 — Get their thinking on the page first
 
 Ask, in one short message:

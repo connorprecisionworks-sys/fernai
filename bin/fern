@@ -49,7 +49,7 @@ SNAPSHOT = os.path.join(DIR, "snapshot.json")
 WELCOMED = os.path.join(DIR, ".welcomed")
 MEMORY = os.path.join(DIR, "memory.md")
 STATE = os.path.join(DIR, "state.json")
-VERSION = "2.7.0"
+VERSION = "2.8.0"
 
 
 # ───────────────────────────── style ─────────────────────────────
@@ -969,6 +969,8 @@ exactly, even if you'd have picked something else.
 Your answers end with an offer or a physical action, never with an
 instruction to go feel motivated. Things you can actually make:
 
+- **sources for a paper** — `research`, which vets them and files them where
+  `draft` will pick them up
 - a **study packet** — build it, don't describe it
 - **everything at once** — `batch`, when they want the whole week handled
 - a plan with named blocks — `/plan-week`
@@ -1080,6 +1082,9 @@ ROUTES = [
                r"lab writeup|discussion post|response|reflection|proposal|assignment)\b"),
     ("email",  r"\b(email|write|message)\b[^.?!]{0,30}\b(prof|professor|ta\b|instructor|"
                r"advisor|dean)\b|\bask for an extension\b"),
+    ("research", r"\b(find|need|get|gather)\b[^.?!]{0,25}\b(sources?|citations?|"
+                 r"references?|papers?|studies|articles)\b|\bresearch\b[^.?!]{0,20}"
+                 r"\b(for|on|about|topic|paper|essay)\b|\bfact.?check\b"),
     ("triage", r"\b(what should i (do|work on|start)|where do i (start|begin)|"
                r"prioriti[sz]e|rank (everything|my|all))\b"),
     ("plan-week", r"\b(plan my week|weekly (plan|schedule)|schedule my week|"
@@ -1226,6 +1231,103 @@ def md_line(line):
                      for i, p in enumerate(pieces))
 
 
+class TaskPanel:
+    """Live view of parallel subagents: spinner while running, tick when done.
+
+    Redraws in place with cursor movement. Any streamed prose closes the panel
+    first, so text never lands in the middle of it.
+    """
+
+    def __init__(self):
+        self.tasks = {}          # tool_use_id -> dict
+        self.order = []
+        self.lines = 0           # rows currently painted
+        self.live = False
+        self.stop = False
+        self.t = None
+        self.lock = threading.Lock()
+
+    def add(self, tid, label):
+        with self.lock:
+            if tid in self.tasks:
+                return
+            self.tasks[tid] = {"label": label or "working",
+                               "t0": time.time(), "done": False}
+            self.order.append(tid)
+        if S.on:
+            self._start()
+        else:
+            print(f"    · started  {self.tasks[tid]['label']}", flush=True)
+
+    def finish(self, tid, failed=False):
+        with self.lock:
+            task = self.tasks.get(tid)
+            if not task or task["done"]:
+                return
+            task["done"] = True
+            task["failed"] = failed
+            task["dt"] = time.time() - task["t0"]
+            label, dt = task["label"], task["dt"]
+            everything_done = all(x["done"] for x in self.tasks.values())
+        if S.on:
+            self._paint()
+            if everything_done:
+                self.close()
+        else:
+            mark = "failed " if failed else "done   "
+            print(f"    {mark}  {label}  ({dt:.0f}s)", flush=True)
+
+    def _start(self):
+        if self.live or not S.on:
+            self._paint()
+            return
+        self.live, self.stop = True, False
+
+        def run():
+            while not self.stop:
+                self._paint()
+                time.sleep(0.1)
+        self.t = threading.Thread(target=run, daemon=True)
+        self.t.start()
+
+    def _paint(self):
+        with self.lock:
+            if not self.order:
+                return
+            frame = Spinner.FRAMES[int(time.time() * 11) % len(Spinner.FRAMES)]
+            rows = []
+            for tid in self.order:
+                x = self.tasks[tid]
+                if x["done"]:
+                    mark = S.red(CROSS) if x.get("failed") else S.green(TICK)
+                    tail = S.gray(f"{x['dt']:.0f}s")
+                else:
+                    mark = S.cyan(frame)
+                    tail = S.gray(f"{time.time() - x['t0']:.0f}s")
+                rows.append(f"    {mark} {fit(x['label'], width() - 16)} {tail}")
+            out = "\n".join(rows)
+            if not S.on:
+                return          # plain logs get per-task lines instead
+            if self.lines:
+                sys.stdout.write(f"\033[{self.lines}A\r\033[J")
+            sys.stdout.write(out + "\n")
+            sys.stdout.flush()
+            self.lines = len(rows)
+
+    def close(self):
+        """Leave the finished panel on screen and stop redrawing it."""
+        self.stop = True
+        if self.t:
+            self.t.join()
+            self.t = None
+        if self.order:
+            self._paint()
+        self.live = False
+        self.lines = 0
+        self.order = []
+        self.tasks = {}
+
+
 class MDStream:
     """Buffers streamed text and renders it line by line."""
 
@@ -1303,6 +1405,7 @@ def ask_claude(prompt, session_id=None, stream=True):
 
     text, sid, started, api_error = "", session_id, False, None
     md = MDStream()
+    panel = TaskPanel()
     sp = Spinner("thinking") if stream else None
     if sp:
         sp.__enter__()
@@ -1318,6 +1421,19 @@ def ask_claude(prompt, session_id=None, stream=True):
             if ev.get("session_id"):
                 sid = ev["session_id"]
             t = ev.get("type")
+
+            if t == "assistant":
+                for blk in (ev.get("message") or {}).get("content") or []:
+                    if blk.get("type") == "tool_use" and blk.get("name") == "Task":
+                        inp = blk.get("input") or {}
+                        panel.add(blk.get("id"),
+                                  inp.get("description") or inp.get("subagent_type"))
+            elif t == "user":
+                for blk in (ev.get("message") or {}).get("content") or []:
+                    if blk.get("type") == "tool_result":
+                        panel.finish(blk.get("tool_use_id"),
+                                     failed=bool(blk.get("is_error")))
+
             if t == "stream_event":
                 d = (ev.get("event") or {}).get("delta") or {}
                 if d.get("type") == "text_delta":
@@ -1327,6 +1443,9 @@ def ask_claude(prompt, session_id=None, stream=True):
                             if sp:
                                 sp.clear()
                             started = True
+                        if panel.live:
+                            panel.close()
+                            print()
                         if stream:
                             md.feed(chunk)
                         text += chunk
@@ -1345,6 +1464,7 @@ def ask_claude(prompt, session_id=None, stream=True):
     finally:
         if sp and not started:
             sp.clear()
+        panel.close()
         if stream:
             md.flush()
         remember(md.facts, md.drops)

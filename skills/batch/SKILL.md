@@ -37,6 +37,9 @@ Split into three buckets:
 
 - **Draftable** — writing, labs, memos, discussion posts, responses, proposals.
   A draft saves real time.
+- **Needs sources first** — anything requiring citations with no file in
+  `~/Desktop/fern-research/`. Spawn a `research` subagent for it, then a draft
+  subagent that reads what it produced. Chain them; don't draft citations blind.
 - **Not draftable** — problem sets, quizzes, exams, click-through modules.
   Drafting is meaningless. Say so in one line and move on; don't spawn an agent.
 - **Skip** — worth few points in a class already above 90, and due more than a
