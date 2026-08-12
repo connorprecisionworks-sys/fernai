@@ -49,7 +49,7 @@ SNAPSHOT = os.path.join(DIR, "snapshot.json")
 WELCOMED = os.path.join(DIR, ".welcomed")
 MEMORY = os.path.join(DIR, "memory.md")
 STATE = os.path.join(DIR, "state.json")
-VERSION = "2.9.2"
+VERSION = "3.0.1"
 
 
 # ───────────────────────────── style ─────────────────────────────
@@ -315,7 +315,20 @@ def get(url, token, params=None):
         "Authorization": f"Bearer {token}", "Accept": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
-            return json.loads(r.read().decode()), next_link(r.headers.get("Link", ""))
+            raw = r.read().decode("utf-8", "replace")
+            ctype = (r.headers.get("Content-Type") or "").lower()
+            try:
+                body = json.loads(raw)
+            except ValueError:
+                # An HTML login page, an SSO redirect, a parked domain — anything
+                # that answers 200 with something that isn't the Canvas API.
+                if "html" in ctype or raw.lstrip()[:1] == "<":
+                    die("That address answered, but it isn't the Canvas API.",
+                        "You may be hitting an SSO login page. Use the plain Canvas\n"
+                        "    domain, e.g. https://yourschool.instructure.com")
+                die("Canvas sent back something unreadable.",
+                    f"Content-Type was {ctype or 'unknown'}.")
+            return body, next_link(r.headers.get("Link", ""))
     except urllib.error.HTTPError as e:
         if e.code == 401:
             die("Canvas rejected the token (401).",
@@ -325,6 +338,9 @@ def get(url, token, params=None):
                 "Your school may have API tokens disabled. Use the /canvas skill instead.")
         if e.code == 404:
             return None, None
+        if e.code in (301, 302, 307, 308):
+            die(f"That URL redirects somewhere else (HTTP {e.code}).",
+                "Use the bare domain, e.g. https://yourschool.instructure.com")
         die(f"Canvas returned HTTP {e.code}.")
     except urllib.error.URLError as e:
         die(f"Could not reach Canvas: {e.reason}", "Check the URL and your connection.")
@@ -339,6 +355,8 @@ def next_link(header):
 
 
 def get_all(base, token, path, params=None, cap=50):
+    """Always returns a list. Canvas answers errors with an object, and callers
+    that iterate it get characters instead of records."""
     params = dict(params or {})
     params.setdefault("per_page", 100)
     out, url, pages = [], base + path, 0
@@ -347,8 +365,17 @@ def get_all(base, token, path, params=None, cap=50):
         if body is None:
             break
         if isinstance(body, dict):
-            return body
-        out.extend(body)
+            errs = body.get("errors") or body.get("message") or body.get("status")
+            if errs:
+                msg = errs
+                if isinstance(errs, list):
+                    msg = "; ".join(str(e.get("message", e)) if isinstance(e, dict)
+                                    else str(e) for e in errs)
+                die(f"Canvas refused {path}.", str(msg)[:200])
+            return []                       # an object where a list belongs
+        if not isinstance(body, list):
+            return []
+        out.extend(x for x in body if isinstance(x, dict))
         pages += 1
     return out
 
@@ -429,6 +456,17 @@ RISK_LINES = [
 ]
 
 
+def verify_token(base, token):
+    """Confirm the URL is a Canvas site and the token works. Never returns None."""
+    me, _ = get(base + "/api/v1/users/self", token)
+    if not isinstance(me, dict) or not me.get("id") and not me.get("name"):
+        die(f"No Canvas API found at {base}.",
+            "Check the domain — it's the part before the first slash in your\n"
+            "    Canvas address, e.g. https://jcseagles.instructure.com\n"
+            "    (not the /profile/settings page, and not the example URL).")
+    return me
+
+
 def cmd_setup(args):
     banner()
     box("Heads up — read this", RISK_LINES, S.yellow)
@@ -450,7 +488,8 @@ def cmd_setup(args):
     rule("setup")
 
     step(1, 4, "Canvas URL")
-    info("e.g. school.instructure.com  or  canvas.school.edu")
+    info("the domain only — e.g. yourschool.instructure.com")
+    info("(open Canvas and copy the bit before the first slash)")
     url = normalize_url(args.url or input(f"  {S.cyan(ARROW)} "))
     ok(f"Using {S.bold(url)}")
 
@@ -467,13 +506,13 @@ def cmd_setup(args):
     ok(f"Got a {len(token)}-character token {S.gray('(…' + token[-4:] + ')')}")
 
     step(3, 4, "Verify")
+    with Spinner("Talking to Canvas") as sp:
+        me = verify_token(url, token)          # dies with a useful message on failure
+        sp.done(f"Connected as {S.bold(me.get('name') or me.get('id'))}")
     write_private(CREDS, {
         "canvas_url": url, "token": token,
         "accepted_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
     })
-    with Spinner("Talking to Canvas") as sp:
-        me, _ = get(url + "/api/v1/users/self", token)
-        sp.done(f"Connected as {S.bold(me.get('name', '?'))}")
     info(f"Token saved to {CREDS} (0600)")
 
     step(4, 4, "First sync")
@@ -515,15 +554,21 @@ def do_sync(base, token, only):
         with Spinner(f"{name}") as sp:
             raw = get_all(base, token, f"/api/v1/courses/{cid}/assignments",
                           {"include[]": ["submission"], "order_by": "due_at"})
-            if isinstance(raw, dict):
-                raw = []
             items = [{"title": a.get("name"), "due": a.get("due_at"),
                       "points": a.get("points_possible"),
                       "status": status_of(a.get("submission") or {}),
                       "score": (a.get("submission") or {}).get("score"),
                       "url": a.get("html_url"),
                       "type": (a.get("submission_types") or [None])[0],
-                      "prompt": detag(a.get("description"))} for a in raw]
+                      "prompt": detag(a.get("description")),
+                      "rubric": [{"criterion": r.get("description"),
+                                  "points": r.get("points"),
+                                  "description": detag(r.get("long_description"), 300)}
+                                 for r in (a.get("rubric") or [])] or None,
+                      "files": sorted({m.group(1) for m in re.finditer(
+                          r"/files/\d+[^\"\'<>]*?[?&]?wrap[^\"\'<>]*|>([^<>]{3,60}\.(?:pdf|docx?|pptx?|xlsx?|csv|zip))<",
+                          a.get("description") or "") if m.group(1)})[:6],
+                      } for a in raw]
             g = grade_of(c)
             sp.done(f"{S.bold(name):<22} {len(items):>2} assignments"
                     f"{'   ' + S.gray(g) if g else ''}")
@@ -550,8 +595,9 @@ def cmd_test(args):
     c = load_creds()
     print()
     with Spinner("Checking token") as sp:
-        me, _ = get(c["canvas_url"] + "/api/v1/users/self", c["token"])
-        sp.done(f"Token works — {S.bold(me.get('name', '?'))} at {S.gray(c['canvas_url'])}")
+        me = verify_token(c["canvas_url"], c["token"])
+        sp.done(f"Token works — {S.bold(me.get('name') or me.get('id'))} "
+                f"at {S.gray(c['canvas_url'])}")
     print()
 
 
@@ -710,38 +756,124 @@ DEMO_SEMESTER = {'pulled_at': None,
                                'points': 10,
                                'status': 'graded',
                                'score': 10,
-                               'url': None},
+                               'url': None,
+                               'type': 'online_quiz',
+                               'prompt': 'Ten questions on the syllabus. Unlimited attempts, '
+                                         'highest score kept.',
+                               'rubric': None,
+                               'files': []},
                               {'title': 'Lab 1: Microscopy writeup',
-   'prompt': 'Formal lab report on the microscopy exercise (Weeks 1-2).\nSections required, in order: Title, Introduction (state the purpose and one hypothesis), Materials & Methods (past tense, passive voice), Results (include your labelled sketches at 40x, 100x and 400x with magnification stated for each), Discussion (compare observed cell structures to the textbook figures; address at least two sources of error), References (CSE style, minimum 2).\n- 4-6 pages, double spaced, 12pt\n- Your own data only. Sketches must be your originals from lab.\n- Submit as PDF. Late work accepted up to 7 days at -10%/day.',
                                '_due_offset_days': -3,
                                '_due_time': [23, 59],
                                'points': 50,
                                'status': 'missing',
                                'score': None,
-                               'url': None},
+                               'url': None,
+                               'type': 'online_upload',
+                               'prompt': 'Formal lab report on the Week 1-2 microscopy '
+                                         'exercise.\n'
+                                         'Sections in order: Title, Introduction (purpose + '
+                                         'one hypothesis), Materials & Methods (past tense, '
+                                         'passive), Results (labelled sketches at 40x, 100x, '
+                                         '400x with magnification stated), Discussion '
+                                         '(compare observed structures to Fig. 4.2 in the '
+                                         'text; address at least two sources of error), '
+                                         'References (CSE, min 2).\n'
+                                         '4-6 pages, double spaced, 12pt. Your own sketches '
+                                         'only. Submit PDF.\n'
+                                         'Late accepted 7 days at -10%/day.',
+                               'rubric': [{'criterion': 'Hypothesis & purpose',
+                                           'points': 8,
+                                           'description': 'States a testable hypothesis and '
+                                                          'why it matters'},
+                                          {'criterion': 'Methods',
+                                           'points': 10,
+                                           'description': 'Past tense, passive, reproducible '
+                                                          'by a peer'},
+                                          {'criterion': 'Results & figures',
+                                           'points': 15,
+                                           'description': 'Labelled sketches, magnification '
+                                                          'stated, no interpretation'},
+                                          {'criterion': 'Discussion',
+                                           'points': 12,
+                                           'description': 'Compares to expected structures; '
+                                                          'two sources of error'},
+                                          {'criterion': 'References & format',
+                                           'points': 5,
+                                           'description': 'CSE style, min 2, correct page '
+                                                          'setup'}],
+                               'files': ['Lab1_manual.pdf', 'CSE_citation_guide.pdf']},
                               {'title': 'Lab 2: Cell division writeup',
-   'prompt': 'Same report format as Lab 1, using your onion root tip mitosis counts. Include the mitotic index calculation and a table of phase counts.',
                                '_due_offset_days': 4,
                                '_due_time': [23, 59],
                                'points': 50,
                                'status': 'not_submitted',
                                'score': None,
-                               'url': None},
+                               'url': None,
+                               'type': 'online_upload',
+                               'prompt': 'Same report format as Lab 1, using your onion root '
+                                         'tip mitosis counts. Include the mitotic index '
+                                         'calculation and a table of phase counts '
+                                         '(interphase, prophase, metaphase, anaphase, '
+                                         'telophase). Discussion must address why the '
+                                         'observed proportions differ from the theoretical '
+                                         'durations.',
+                               'rubric': [{'criterion': 'Hypothesis & purpose',
+                                           'points': 8,
+                                           'description': 'States a testable hypothesis and '
+                                                          'why it matters'},
+                                          {'criterion': 'Methods',
+                                           'points': 10,
+                                           'description': 'Past tense, passive, reproducible '
+                                                          'by a peer'},
+                                          {'criterion': 'Results & figures',
+                                           'points': 15,
+                                           'description': 'Labelled sketches, magnification '
+                                                          'stated, no interpretation'},
+                                          {'criterion': 'Discussion',
+                                           'points': 12,
+                                           'description': 'Compares to expected structures; '
+                                                          'two sources of error'},
+                                          {'criterion': 'References & format',
+                                           'points': 5,
+                                           'description': 'CSE style, min 2, correct page '
+                                                          'setup'}],
+                               'files': ['Lab2_manual.pdf', 'mitosis_count_sheet.xlsx']},
                               {'title': 'Discussion board wk3',
-   'prompt': 'Post a 150-word response to the prompt, then reply substantively to two classmates by Sunday. Cite the reading at least once.',
                                '_due_offset_days': 6,
                                '_due_time': [23, 59],
                                'points': 10,
                                'status': 'not_submitted',
                                'score': None,
-                               'url': None},
+                               'url': None,
+                               'type': 'discussion_topic',
+                               'prompt': 'Prompt: does the endosymbiotic theory qualify as a '
+                                         "'fact' or a 'theory' in the scientific sense? 150 "
+                                         'words minimum, cite the reading once. Then reply '
+                                         'substantively to two classmates by Sunday 11:59pm.',
+                               'rubric': [{'criterion': 'Original post',
+                                           'points': 6,
+                                           'description': '150+ words, cites the reading'},
+                                          {'criterion': 'Two replies',
+                                           'points': 4,
+                                           'description': "Substantive, not 'I agree'"}],
+                               'files': []},
                               {'title': 'Exam 1 (in class)',
                                '_due_offset_days': 9,
                                '_due_time': [14, 0],
                                'points': 150,
                                'status': 'not_submitted',
                                'score': None,
-                               'url': None}]},
+                               'url': None,
+                               'type': 'on_paper',
+                               'prompt': 'In-class, 75 minutes, closed book. Covers ch. 1-6 '
+                                         'and Labs 1-2. Format: 40 multiple choice (2 pts), '
+                                         '5 short answer (10 pts), 1 diagram labelling (20 '
+                                         'pts). A one-page handwritten formula/diagram sheet '
+                                         'is allowed. Study guide posted under Files.',
+                               'rubric': None,
+                               'files': ['Exam1_study_guide.pdf',
+                                         'Exam1_practice_2025.pdf']}]},
              {'id': '102',
               'name': 'CHEM 240',
               'full_name': 'Organic Chemistry I',
@@ -752,36 +884,73 @@ DEMO_SEMESTER = {'pulled_at': None,
                                'points': 40,
                                'status': 'graded',
                                'score': 26,
-                               'url': None},
+                               'url': None,
+                               'type': 'online_upload',
+                               'prompt': 'Ch. 1-3: nomenclature, hybridisation, resonance. '
+                                         'Show all work.',
+                               'rubric': None,
+                               'files': ['PS1.pdf', 'PS1_solutions.pdf']},
                               {'title': 'Lab safety module',
                                '_due_offset_days': -4,
                                '_due_time': [23, 59],
                                'points': 15,
                                'status': 'missing',
                                'score': None,
-                               'url': None},
+                               'url': None,
+                               'type': 'external_tool',
+                               'prompt': 'Complete the online lab safety module (approx 20 '
+                                         'min) and the 10-question quiz at the end. You must '
+                                         'score 100% to enter lab; unlimited attempts. '
+                                         'Required before Lab 3.',
+                               'rubric': None,
+                               'files': []},
                               {'title': 'Problem set 2',
                                '_due_offset_days': -1,
                                '_due_time': [23, 59],
                                'points': 40,
                                'status': 'late',
                                'score': None,
-                               'url': None},
+                               'url': None,
+                               'type': 'online_upload',
+                               'prompt': 'Ch. 4-6: conformational analysis, stereochemistry, '
+                                         'R/S assignment. Chair conformations must be drawn, '
+                                         'not described.',
+                               'rubric': None,
+                               'files': ['PS2.pdf']},
                               {'title': 'Problem set 3',
-   'prompt': 'Chapter 7 problems 1-14. Show mechanisms with curved arrows. Answers without mechanisms receive no credit.',
                                '_due_offset_days': 1,
                                '_due_time': [23, 59],
                                'points': 40,
                                'status': 'not_submitted',
                                'score': None,
-                               'url': None},
+                               'url': None,
+                               'type': 'online_upload',
+                               'prompt': 'Ch. 7 problems 1-14 (substitution and '
+                                         'elimination).\n'
+                                         'Every mechanism must show curved arrows. Answers '
+                                         'without mechanisms receive no credit. For 8-14, '
+                                         'state whether the reaction is SN1, SN2, E1 or E2 '
+                                         'and justify in one sentence using substrate, '
+                                         'nucleophile and solvent.',
+                               'rubric': None,
+                               'files': ['PS3.pdf', 'Ch7_mechanism_summary.pdf']},
                               {'title': 'Midterm 1',
                                '_due_offset_days': 11,
                                '_due_time': [13, 0],
                                'points': 200,
                                'status': 'not_submitted',
                                'score': None,
-                               'url': None}]},
+                               'url': None,
+                               'type': 'on_paper',
+                               'prompt': 'In-class, 110 minutes. Covers ch. 1-7 and PS 1-3. '
+                                         'Molecular model kit permitted; no notes. Roughly '
+                                         '60% mechanisms, 25% stereochemistry, 15% '
+                                         'nomenclature. Old exams from 2024 and 2025 are '
+                                         'posted.',
+                               'rubric': None,
+                               'files': ['Midterm1_topics.pdf',
+                                         'Midterm_2024.pdf',
+                                         'Midterm_2025.pdf']}]},
              {'id': '103',
               'name': 'HIST 110',
               'full_name': 'US History to 1877',
@@ -792,30 +961,104 @@ DEMO_SEMESTER = {'pulled_at': None,
                                'points': 15,
                                'status': 'graded',
                                'score': 14,
-                               'url': None},
+                               'url': None,
+                               'type': 'online_upload',
+                               'prompt': '500 words on Foner ch. 8. Pick one primary source '
+                                         'and argue what it reveals that the chapter '
+                                         'narrative does not.',
+                               'rubric': [{'criterion': 'Argument',
+                                           'points': 8,
+                                           'description': 'Makes a claim the chapter does '
+                                                          'not make'},
+                                          {'criterion': 'Use of source',
+                                           'points': 5,
+                                           'description': 'Quotes and analyses one primary '
+                                                          'source closely'},
+                                          {'criterion': 'Writing',
+                                           'points': 2,
+                                           'description': 'Under 500 words, no summary '
+                                                          'padding'}],
+                               'files': []},
                               {'title': 'Reading response 3',
-   'prompt': '500 words on the assigned chapter (Foner ch. 9). Pick ONE primary source from the chapter and argue what it reveals that the chapter narrative does not. Do not summarise the chapter.',
                                '_due_offset_days': 2,
                                '_due_time': [23, 59],
                                'points': 15,
                                'status': 'not_submitted',
                                'score': None,
-                               'url': None},
+                               'url': None,
+                               'type': 'online_upload',
+                               'prompt': '500 words on Foner ch. 9. Same format as RR2: pick '
+                                         'ONE primary source from the chapter and argue what '
+                                         'it reveals that the chapter narrative does not. Do '
+                                         'not summarise the chapter — I have read it.',
+                               'rubric': [{'criterion': 'Argument',
+                                           'points': 8,
+                                           'description': 'Makes a claim the chapter does '
+                                                          'not make'},
+                                          {'criterion': 'Use of source',
+                                           'points': 5,
+                                           'description': 'Quotes and analyses one primary '
+                                                          'source closely'},
+                                          {'criterion': 'Writing',
+                                           'points': 2,
+                                           'description': 'Under 500 words, no summary '
+                                                          'padding'}],
+                               'files': ['Foner_ch9.pdf']},
                               {'title': 'Primary source analysis',
-   'prompt': '1500 words analysing a single primary source from the course reader. Address: who produced it and why, intended audience, what it claims, what it omits, and how it complicates one argument from lecture. Chicago footnotes.',
                                '_due_offset_days': 7,
                                '_due_time': [23, 59],
                                'points': 100,
                                'status': 'not_submitted',
                                'score': None,
-                               'url': None},
+                               'url': None,
+                               'type': 'online_upload',
+                               'prompt': '1500 words on a single primary source from the '
+                                         'course reader.\n'
+                                         'Address: who produced it and why, intended '
+                                         'audience, what it claims, what it omits, and how '
+                                         'it complicates one argument from lecture.\n'
+                                         'Chicago footnotes. No secondary sources required, '
+                                         'but if you use them they must be scholarly.',
+                               'rubric': [{'criterion': 'Contextualisation',
+                                           'points': 25,
+                                           'description': 'Who made it, for whom, why, when'},
+                                          {'criterion': 'Close reading',
+                                           'points': 30,
+                                           'description': 'What it claims and what it '
+                                                          'conspicuously omits'},
+                                          {'criterion': 'Argument',
+                                           'points': 30,
+                                           'description': 'Complicates a specific lecture '
+                                                          'claim'},
+                                          {'criterion': 'Citations',
+                                           'points': 15,
+                                           'description': 'Chicago footnotes, correct form'}],
+                               'files': ['course_reader_excerpts.pdf']},
                               {'title': 'Term paper proposal',
                                '_due_offset_days': 18,
                                '_due_time': [23, 59],
                                'points': 50,
                                'status': 'not_submitted',
                                'score': None,
-                               'url': None}]},
+                               'url': None,
+                               'type': 'online_upload',
+                               'prompt': 'One page: your question, the primary source base '
+                                         'you will use, and three scholarly secondary '
+                                         'sources with one sentence each on what they argue. '
+                                         'The question must be arguable, not a topic.',
+                               'rubric': [{'criterion': 'Question',
+                                           'points': 20,
+                                           'description': 'Arguable, narrow enough for 15 '
+                                                          'pages'},
+                                          {'criterion': 'Source base',
+                                           'points': 20,
+                                           'description': 'Real, accessible primary sources '
+                                                          'identified'},
+                                          {'criterion': 'Secondary reading',
+                                           'points': 10,
+                                           'description': 'Three scholarly works, correctly '
+                                                          'characterised'}],
+                               'files': []}]},
              {'id': '104',
               'name': 'MATH 231',
               'full_name': 'Linear Algebra',
@@ -826,29 +1069,50 @@ DEMO_SEMESTER = {'pulled_at': None,
                                'points': 25,
                                'status': 'graded',
                                'score': 20,
-                               'url': None},
+                               'url': None,
+                               'type': 'online_upload',
+                               'prompt': 'Section 1.1-1.4: systems, row reduction, vector '
+                                         'equations. Show row operations.',
+                               'rubric': None,
+                               'files': ['HW1.pdf']},
                               {'title': 'Homework 2',
-   'prompt': 'Section 2.3 problems 1-20 odd. Show row operations.',
                                '_due_offset_days': 2,
                                '_due_time': [23, 59],
                                'points': 25,
                                'status': 'not_submitted',
                                'score': None,
-                               'url': None},
+                               'url': None,
+                               'type': 'online_upload',
+                               'prompt': 'Section 2.1-2.3: matrix operations, inverses, LU '
+                                         'factorisation. Show row operations. Answers only '
+                                         'receive half credit.',
+                               'rubric': None,
+                               'files': ['HW2.pdf']},
                               {'title': 'Quiz 1 (online)',
                                '_due_offset_days': 3,
                                '_due_time': [23, 59],
                                'points': 30,
                                'status': 'not_submitted',
                                'score': None,
-                               'url': None},
+                               'url': None,
+                               'type': 'online_quiz',
+                               'prompt': '45 minutes, one attempt, opens Wed 8am closes Thu '
+                                         '11:59pm. Covers ch. 1-2. Calculator allowed, no '
+                                         'notes. Six questions, mostly computational.',
+                               'rubric': None,
+                               'files': ['Quiz1_topics.pdf']},
                               {'title': 'Homework 3',
                                '_due_offset_days': 9,
                                '_due_time': [23, 59],
                                'points': 25,
                                'status': 'not_submitted',
                                'score': None,
-                               'url': None}]},
+                               'url': None,
+                               'type': 'online_upload',
+                               'prompt': "Section 3.1-3.3: determinants, Cramer's rule, "
+                                         'volume. Cofactor expansion must be shown.',
+                               'rubric': None,
+                               'files': ['HW3.pdf']}]},
              {'id': '105',
               'name': 'ENGL 205',
               'full_name': 'Technical Writing',
@@ -859,30 +1123,95 @@ DEMO_SEMESTER = {'pulled_at': None,
                                'points': 5,
                                'status': 'submitted',
                                'score': None,
-                               'url': None},
+                               'url': None,
+                               'type': 'discussion_topic',
+                               'prompt': 'Introduce yourself in 100 words: major, why this '
+                                         'course, one thing you write often.',
+                               'rubric': None,
+                               'files': []},
                               {'title': 'Memo assignment',
-   'prompt': 'Write a 1-2 page internal memo recommending one of the three vendor options in the case packet (posted under Files > Week 3).\n- Standard memo header: TO / FROM / DATE / SUBJECT\n- Lead with the recommendation in the first sentence. No suspense.\n- Support with exactly three criteria; use a table only if it earns its space\n- Close with the specific next action you want your reader to take\n- Audience is a busy non-technical manager. Plain language.\nGraded on: recommendation clarity (20), evidence (20), organisation (10), audience fit (10).',
                                '_due_offset_days': 3,
                                '_due_time': [23, 59],
                                'points': 60,
                                'status': 'not_submitted',
                                'score': None,
-                               'url': None},
+                               'url': None,
+                               'type': 'online_upload',
+                               'prompt': 'Write a 1-2 page internal memo recommending ONE of '
+                                         'the three vendor options in the case packet (Files '
+                                         '> Week 3 > vendor_case_packet.pdf).\n'
+                                         '- Standard memo header: TO / FROM / DATE / '
+                                         'SUBJECT\n'
+                                         '- Lead with the recommendation in the first '
+                                         'sentence. No suspense.\n'
+                                         '- Support with exactly three criteria\n'
+                                         '- Close with the specific next action you want '
+                                         'your reader to take\n'
+                                         '- Audience: a busy non-technical operations '
+                                         'manager\n'
+                                         'Single spaced, 11pt, no cover page.',
+                               'rubric': [{'criterion': 'Recommendation clarity',
+                                           'points': 20,
+                                           'description': 'Recommendation in the first '
+                                                          'sentence, unambiguous'},
+                                          {'criterion': 'Evidence',
+                                           'points': 20,
+                                           'description': 'Exactly three criteria, each '
+                                                          'supported from the case packet'},
+                                          {'criterion': 'Organisation',
+                                           'points': 10,
+                                           'description': 'Memo header, scannable, no wall '
+                                                          'of text'},
+                                          {'criterion': 'Audience fit',
+                                           'points': 10,
+                                           'description': 'Plain language for a '
+                                                          'non-technical manager'}],
+                               'files': ['vendor_case_packet.pdf',
+                                         'memo_template.docx',
+                                         'sample_memo_annotated.pdf']},
                               {'title': 'Peer review of memo',
-   'prompt': 'Review two classmates\' memos using the posted rubric. For each: one thing that works, two specific changes, and whether the recommendation is clear in the first sentence.',
                                '_due_offset_days': 6,
                                '_due_time': [23, 59],
                                'points': 20,
                                'status': 'not_submitted',
                                'score': None,
-                               'url': None},
+                               'url': None,
+                               'type': 'peer_review',
+                               'prompt': "Review two classmates' memos using the posted "
+                                         'rubric. For each: one thing that works, two '
+                                         'specific changes, and whether the recommendation '
+                                         'is clear in the first sentence. 150 words per '
+                                         'review minimum.',
+                               'rubric': [{'criterion': 'Specificity',
+                                           'points': 12,
+                                           'description': 'Points to actual sentences, not '
+                                                          'general praise'},
+                                          {'criterion': 'Rubric use',
+                                           'points': 8,
+                                           'description': 'Applies the memo rubric criteria '
+                                                          'by name'}],
+                               'files': ['peer_review_form.docx']},
                               {'title': 'Resume draft',
                                '_due_offset_days': None,
                                '_due_time': None,
                                'points': 40,
                                'status': 'not_submitted',
                                'score': None,
-                               'url': None}]}]}
+                               'url': None,
+                               'type': 'online_upload',
+                               'prompt': 'One page, reverse chronological. Bring a draft to '
+                                         'the Week 6 workshop. Graded on the workshop day — '
+                                         'no separate submission. Use the STAR format for '
+                                         'bullet points; no objective statement.',
+                               'rubric': [{'criterion': 'Format',
+                                           'points': 15,
+                                           'description': 'One page, consistent, scannable '
+                                                          'in 10 seconds'},
+                                          {'criterion': 'Bullets',
+                                           'points': 25,
+                                           'description': 'STAR format, quantified where '
+                                                          'possible'}],
+                               'files': ['resume_workshop_packet.pdf']}]}]}
 
 
 # ───────────────────────────── chat ─────────────────────────────
@@ -1004,7 +1333,8 @@ You are good at this and specific about it. When you estimate:
 ## Style
 
 Terminal output, so: no markdown headers, no tables, no emoji, nothing wider
-than 76 columns. Short lines. Front-load the answer.
+than 76 columns. Short lines. Front-load the answer — the first line should be
+the thing they most need to know, not a lead-up to it.
 
 **Do the arithmetic before you start writing.** Never think out loud, never
 correct yourself mid-answer. If a sentence contains "wait", "actually", "let me
@@ -1012,8 +1342,27 @@ recalculate", or a number you then revise, you have already failed — delete it
 and write the finished thought. The student sees a confident answer or they
 stop trusting the numbers.
 
-**Put a blank line between every group.** Dense blocks of text do not get
-read. Six lines with breathing room beat four crammed together.
+**Six lines is the target. Ten is the ceiling.** Not ten lines "before the
+offer" — ten lines total, including the offer. Almost every answer you want to
+write is twice as long as it needs to be.
+
+What to cut, in order:
+
+- **Preamble.** Never restate the request, never narrate the plan before doing
+  it, never open with a summary of what follows.
+- **Justifying what you skipped.** "Three of those are problem sets so there's
+  nothing to draft" is a subordinate clause at most: "skipping the three
+  problem sets". Usually cut it entirely.
+- **Explaining what you're about to do** when you are also doing it. The list
+  of what's running IS the explanation.
+- **Caveats about your own limitations.** If a rubric is missing, ask for it or
+  proceed; do not write a paragraph about the gap.
+- **Restating what they can already see.** They have the list. Don't reprint it.
+
+A list is not a licence to add framing. If you show five items, that's five
+lines plus a heading, not five lines wrapped in six lines of prose.
+
+**Put a blank line between groups.** Dense blocks don't get read.
 
 **Never use code fences or tables.** They render badly in a terminal. Plain
 lines and dashed lists only.
@@ -1025,7 +1374,12 @@ skill that handles the rest. A wall of text is the exact failure this tool
 exists to prevent, and it applies to you, not just to the study material.
 
 Never open with "Great question." No encouragement unless they ask. No
-"you've got this."
+"you've got this." No sign-off, no "let me know if you need anything else".
+
+The coursework below carries each assignment's INSTRUCTIONS, RUBRIC and the
+FILES posted on Canvas. Use them silently — grade a draft against the rubric
+without announcing that you found a rubric, and reference a posted file by name
+rather than asking whether one exists.
 
 Use their real coursework below. Exact course codes and titles. If you need
 something it doesn't contain — how long a task takes, what they've already
@@ -1063,6 +1417,13 @@ def coursework_context():
             if pr:
                 body = pr if len(pr) <= 1200 else pr[:1200] + " …[see Canvas for the rest]"
                 rows.append("    INSTRUCTIONS: " + body.replace("\n", "\n      "))
+            rb = a.get("rubric")
+            if rb:
+                rows.append("    RUBRIC: " + "; ".join(
+                    f"{r['criterion']} ({r['points']})" for r in rb if r.get("criterion")))
+            fl = a.get("files")
+            if fl:
+                rows.append("    FILES ON CANVAS: " + ", ".join(fl))
         out += rows or ["  (no assignments)"]
         out.append("")
     return "\n".join(out)

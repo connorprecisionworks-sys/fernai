@@ -2,7 +2,7 @@
   "name": "fern-ai",
   "displayName": "Fern AI",
   "description": "Eleven Claude skills plus the fern chat CLI for students: pulls real assignments and grades from Canvas, then handles triage, weekly planning, tutoring, cramming, study packets, drafting, and emails.",
-  "version": "2.9.2",
+  "version": "3.0.1",
   "author": {
     "name": "Connor"
   },

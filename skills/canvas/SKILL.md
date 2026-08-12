@@ -97,7 +97,14 @@ Write to `~/.claude/fern/snapshot.json`:
           "points": 50,
           "status": "not_submitted",
           "score": null,
-          "url": "https://school.instructure.com/courses/12345/assignments/98765"
+          "type": "online_upload",
+          "url": "https://school.instructure.com/courses/12345/assignments/98765",
+          "prompt": "Full assignment instructions as plain text — sections\nrequired, length, format, late policy. This is the field that\nstops every downstream skill from having to ask.",
+          "rubric": [
+            {"criterion": "Methods", "points": 10, "description": "..."},
+            {"criterion": "Discussion", "points": 12, "description": "..."}
+          ],
+          "files": ["Lab4_manual.pdf", "CSE_citation_guide.pdf"]
         }
       ]
     }
@@ -108,6 +115,12 @@ Write to `~/.claude/fern/snapshot.json`:
 
 `status` is one of: `not_submitted`, `submitted`, `graded`, `missing`, `late`,
 `unknown`. Use `unknown` rather than guessing.
+
+**`prompt`, `rubric` and `files` are the ones that matter.** Without them every
+later skill has to interrogate the student about things Canvas already knows.
+Read the assignment page, not just the index — the index has titles and dates,
+the page has the instructions. Grab the rubric from the "Show Rubric" panel and
+list any attached files by name.
 
 Run `date -Iseconds` for `pulled_at`. Create the directory if needed.
 
